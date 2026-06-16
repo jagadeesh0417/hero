@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import db, { rowsToObjects } from '@/lib/db';
+import { dbExecute, rowsToObjects, getDb } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth';
 import { generateBookingId } from '@/lib/utils';
 
@@ -7,33 +7,38 @@ export async function GET(request: NextRequest) {
   const email = await getAdminSession();
   if (!email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { searchParams } = new URL(request.url);
-  const search = searchParams.get('search') || '';
-  const status = searchParams.get('status') || '';
+  try {
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get('search') || '';
+    const status = searchParams.get('status') || '';
 
-  let query = `
-    SELECT b.*, d.date, s.time
-    FROM bookings b
-    JOIN dates d ON b.date_id = d.id
-    JOIN slots s ON b.slot_id = s.id
-    WHERE 1=1
-  `;
-  const params: (string | number)[] = [];
+    let query = `
+      SELECT b.*, d.date, s.time
+      FROM bookings b
+      JOIN dates d ON b.date_id = d.id
+      JOIN slots s ON b.slot_id = s.id
+      WHERE 1=1
+    `;
+    const params: (string | number)[] = [];
 
-  if (search) {
-    query += ' AND (b.booking_id LIKE ? OR d.date LIKE ?)';
-    params.push(`%${search}%`, `%${search}%`);
+    if (search) {
+      query += ' AND (b.booking_id LIKE ? OR d.date LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`);
+    }
+
+    if (status) {
+      query += ' AND b.payment_status = ?';
+      params.push(status);
+    }
+
+    query += ' ORDER BY b.created_at DESC';
+
+    const result = await dbExecute(query, params);
+    return NextResponse.json(rowsToObjects(result));
+  } catch (err: any) {
+    console.error('[API /bookings] GET error:', err?.message || err);
+    return NextResponse.json({ error: 'Failed to fetch bookings' }, { status: 500 });
   }
-
-  if (status) {
-    query += ' AND b.payment_status = ?';
-    params.push(status);
-  }
-
-  query += ' ORDER BY b.created_at DESC';
-
-  const result = await db.execute({ sql: query, args: params });
-  return NextResponse.json(rowsToObjects(result));
 }
 
 export async function POST(request: Request) {
@@ -53,28 +58,25 @@ export async function POST(request: Request) {
       }
     }
 
-    const slotResult = await db.execute({
-      sql: 'SELECT * FROM slots WHERE id = ? AND enabled = 1',
-      args: [slot_id],
-    });
+    const slotResult = await dbExecute('SELECT * FROM slots WHERE id = ? AND enabled = 1', [slot_id]);
     if (slotResult.rows.length === 0) {
       return NextResponse.json({ error: 'Slot not found or disabled' }, { status: 400 });
     }
-    const slot = slotResult.rows[0];
+
+    const slot = slotResult.rows[0] as any;
     const available = Number(slot.available);
 
     if (available < passengers.length) {
       return NextResponse.json({ error: 'Not enough available seats' }, { status: 400 });
     }
 
-    const priceResult = await db.execute({
-      sql: "SELECT value FROM settings WHERE key = 'price_per_ticket'",
-    });
-    const priceRow = priceResult.rows[0];
+    const priceResult = await dbExecute("SELECT value FROM settings WHERE key = 'price_per_ticket'");
+    const priceRow = priceResult.rows[0] as any;
     const pricePerTicket = priceRow ? Number(priceRow.value) : 500;
     const amount = passengers.length * pricePerTicket;
     const bookingId = generateBookingId();
 
+    const db = await getDb();
     const tx = await db.transaction('write');
     try {
       await tx.execute({
@@ -114,7 +116,8 @@ export async function POST(request: Request) {
       },
       { status: 201 }
     );
-  } catch {
+  } catch (err: any) {
+    console.error('[API /bookings] POST error:', err?.message || err);
     return NextResponse.json({ error: 'Failed to create booking' }, { status: 500 });
   }
 }

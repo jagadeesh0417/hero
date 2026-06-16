@@ -1,15 +1,20 @@
 import { NextResponse } from 'next/server';
-import db, { rowsToObjects } from '@/lib/db';
+import { dbExecute, rowsToObjects, getDb } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth';
 
 export async function GET() {
-  const result = await db.execute({ sql: 'SELECT key, value FROM settings' });
-  const rows = rowsToObjects(result) as { key: string; value: string }[];
-  const settings: Record<string, string> = {};
-  for (const row of rows) {
-    settings[row.key] = row.value;
+  try {
+    const result = await dbExecute('SELECT key, value FROM settings');
+    const rows = rowsToObjects(result) as { key: string; value: string }[];
+    const settings: Record<string, string> = {};
+    for (const row of rows) {
+      settings[row.key] = row.value;
+    }
+    return NextResponse.json(settings);
+  } catch (err: any) {
+    console.error('[API /settings] GET error:', err?.message || err);
+    return NextResponse.json({ error: 'Failed to fetch settings' }, { status: 500 });
   }
-  return NextResponse.json(settings);
 }
 
 export async function PUT(request: Request) {
@@ -21,6 +26,7 @@ export async function PUT(request: Request) {
 
     const allowedKeys = ['upi_id', 'upi_name', 'price_per_ticket', 'business_name', 'business_phone', 'business_address'];
 
+    const db = await getDb();
     const tx = await db.transaction('write');
     try {
       for (const [key, value] of Object.entries(body)) {
@@ -39,7 +45,8 @@ export async function PUT(request: Request) {
     }
 
     return NextResponse.json({ message: 'Settings updated' });
-  } catch {
+  } catch (err: any) {
+    console.error('[API /settings] PUT error:', err?.message || err);
     return NextResponse.json({ error: 'Failed to update settings' }, { status: 500 });
   }
 }

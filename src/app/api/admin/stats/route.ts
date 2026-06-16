@@ -1,36 +1,32 @@
 import { NextResponse } from 'next/server';
-import db from '@/lib/db';
+import { dbExecute } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth';
 
 export async function GET() {
   const email = await getAdminSession();
   if (!email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const totalBookingsResult = await db.execute({
-    sql: "SELECT COUNT(*) as cnt FROM bookings WHERE payment_status = 'confirmed'",
-  });
-  const totalPaymentsResult = await db.execute({
-    sql: 'SELECT COALESCE(SUM(amount), 0) as total FROM bookings',
-  });
-  const activeSlotsResult = await db.execute({
-    sql: 'SELECT COUNT(*) as cnt FROM slots WHERE enabled = 1',
-  });
-  const revenueResult = await db.execute({
-    sql: "SELECT COALESCE(SUM(amount), 0) as total FROM bookings WHERE payment_status = 'confirmed'",
-  });
-  const pendingBookingsResult = await db.execute({
-    sql: "SELECT COUNT(*) as cnt FROM bookings WHERE payment_status = 'pending'",
-  });
-  const totalPassengersResult = await db.execute({
-    sql: 'SELECT COUNT(*) as cnt FROM passengers',
-  });
+  try {
+    const [totalBookings, totalPayments, activeSlots, revenue, pendingBookings, totalPassengers] =
+      await Promise.all([
+        dbExecute("SELECT COUNT(*) as cnt FROM bookings WHERE payment_status = 'confirmed'"),
+        dbExecute('SELECT COALESCE(SUM(amount), 0) as total FROM bookings'),
+        dbExecute('SELECT COUNT(*) as cnt FROM slots WHERE enabled = 1'),
+        dbExecute("SELECT COALESCE(SUM(amount), 0) as total FROM bookings WHERE payment_status = 'confirmed'"),
+        dbExecute("SELECT COUNT(*) as cnt FROM bookings WHERE payment_status = 'pending'"),
+        dbExecute('SELECT COUNT(*) as cnt FROM passengers'),
+      ]);
 
-  return NextResponse.json({
-    totalBookings: Number(totalBookingsResult.rows[0].cnt),
-    totalPayments: Number(totalPaymentsResult.rows[0].total),
-    activeSlots: Number(activeSlotsResult.rows[0].cnt),
-    revenue: Number(revenueResult.rows[0].total),
-    pendingBookings: Number(pendingBookingsResult.rows[0].cnt),
-    totalPassengers: Number(totalPassengersResult.rows[0].cnt),
-  });
+    return NextResponse.json({
+      totalBookings: Number(totalBookings.rows[0].cnt),
+      totalPayments: Number(totalPayments.rows[0].total),
+      activeSlots: Number(activeSlots.rows[0].cnt),
+      revenue: Number(revenue.rows[0].total),
+      pendingBookings: Number(pendingBookings.rows[0].cnt),
+      totalPassengers: Number(totalPassengers.rows[0].cnt),
+    });
+  } catch (err: any) {
+    console.error('[API /admin/stats] GET error:', err?.message || err);
+    return NextResponse.json({ error: 'Failed to fetch stats' }, { status: 500 });
+  }
 }

@@ -1,26 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
-import db, { rowsToObjects } from '@/lib/db';
+import { dbExecute, rowsToObjects } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const dateId = searchParams.get('date_id');
+  try {
+    const { searchParams } = new URL(request.url);
+    const dateId = searchParams.get('date_id');
 
-  let result;
-  if (dateId) {
-    result = await db.execute({
-      sql: 'SELECT * FROM slots WHERE date_id = ? ORDER BY time ASC',
-      args: [Number(dateId)],
-    });
-  } else {
-    result = await db.execute({
-      sql: `SELECT s.*, d.date FROM slots s 
-           JOIN dates d ON s.date_id = d.id 
-           ORDER BY d.date DESC, s.time ASC`,
-    });
+    let result;
+    if (dateId) {
+      result = await dbExecute('SELECT * FROM slots WHERE date_id = ? ORDER BY time ASC', [Number(dateId)]);
+    } else {
+      result = await dbExecute(
+        `SELECT s.*, d.date FROM slots s 
+         JOIN dates d ON s.date_id = d.id 
+         ORDER BY d.date DESC, s.time ASC`
+      );
+    }
+
+    return NextResponse.json(rowsToObjects(result));
+  } catch (err: any) {
+    console.error('[API /slots] GET error:', err?.message || err);
+    return NextResponse.json({ error: 'Failed to fetch slots' }, { status: 500 });
   }
-
-  return NextResponse.json(rowsToObjects(result));
 }
 
 export async function POST(request: Request) {
@@ -33,16 +35,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'date_id, time, and capacity are required' }, { status: 400 });
     }
 
-    const result = await db.execute({
-      sql: 'INSERT INTO slots (date_id, time, capacity, available) VALUES (?, ?, ?, ?)',
-      args: [date_id, time, capacity, capacity],
-    });
+    const result = await dbExecute(
+      'INSERT INTO slots (date_id, time, capacity, available) VALUES (?, ?, ?, ?)',
+      [date_id, time, capacity, capacity]
+    );
 
     return NextResponse.json(
       { id: Number(result.lastInsertRowid), date_id, time, capacity },
       { status: 201 }
     );
-  } catch {
+  } catch (err: any) {
+    console.error('[API /slots] POST error:', err?.message || err);
     return NextResponse.json({ error: 'Failed to create slot' }, { status: 500 });
   }
 }
@@ -67,13 +70,11 @@ export async function PUT(request: Request) {
     }
 
     values.push(id);
-    await db.execute({
-      sql: `UPDATE slots SET ${updates.join(', ')} WHERE id = ?`,
-      args: values,
-    });
+    await dbExecute(`UPDATE slots SET ${updates.join(', ')} WHERE id = ?`, values);
 
     return NextResponse.json({ message: 'Slot updated' });
-  } catch {
+  } catch (err: any) {
+    console.error('[API /slots] PUT error:', err?.message || err);
     return NextResponse.json({ error: 'Failed to update slot' }, { status: 500 });
   }
 }
@@ -87,9 +88,10 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
 
-    await db.execute({ sql: 'DELETE FROM slots WHERE id = ?', args: [Number(id)] });
+    await dbExecute('DELETE FROM slots WHERE id = ?', [Number(id)]);
     return NextResponse.json({ message: 'Slot deleted' });
-  } catch {
+  } catch (err: any) {
+    console.error('[API /slots] DELETE error:', err?.message || err);
     return NextResponse.json({ error: 'Failed to delete slot' }, { status: 500 });
   }
 }

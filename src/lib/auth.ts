@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
-import db from './db';
+import { dbExecute, rowToObject } from './db';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret';
 
@@ -54,10 +54,7 @@ export async function getAdminSession(): Promise<string | null> {
   if (!token) return null;
   const payload = verifyToken(token);
   if (!payload) return null;
-  const result = await db.execute({
-    sql: 'SELECT email FROM admin WHERE email = ?',
-    args: [payload.email],
-  });
-  if (result.rows.length === 0) return null;
+  const admin = await dbExecute('SELECT email FROM admin WHERE email = ?', [payload.email]);
+  if (admin.rows.length === 0) return null;
   return payload.email;
 }
