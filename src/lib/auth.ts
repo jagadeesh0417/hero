@@ -54,7 +54,10 @@ export async function getAdminSession(): Promise<string | null> {
   if (!token) return null;
   const payload = verifyToken(token);
   if (!payload) return null;
-  const admin = db.prepare('SELECT email FROM admin WHERE email = ?').get(payload.email);
-  if (!admin) return null;
+  const result = await db.execute({
+    sql: 'SELECT email FROM admin WHERE email = ?',
+    args: [payload.email],
+  });
+  if (result.rows.length === 0) return null;
   return payload.email;
 }

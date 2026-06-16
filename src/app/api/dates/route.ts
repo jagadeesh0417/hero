@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import db from '@/lib/db';
+import db, { rowsToObjects } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth';
 
 export async function GET() {
-  const dates = db.prepare('SELECT * FROM dates ORDER BY date DESC').all();
-  return NextResponse.json(dates);
+  const result = await db.execute({ sql: 'SELECT * FROM dates ORDER BY date DESC' });
+  return NextResponse.json(rowsToObjects(result));
 }
 
 export async function POST(request: Request) {
@@ -15,12 +15,12 @@ export async function POST(request: Request) {
     const { date } = await request.json();
     if (!date) return NextResponse.json({ error: 'Date is required' }, { status: 400 });
 
-    const existing = db.prepare('SELECT id FROM dates WHERE date = ?').get(date);
-    if (existing) return NextResponse.json({ error: 'Date already exists' }, { status: 400 });
+    const existing = await db.execute({ sql: 'SELECT id FROM dates WHERE date = ?', args: [date] });
+    if (existing.rows.length > 0) return NextResponse.json({ error: 'Date already exists' }, { status: 400 });
 
-    const result = db.prepare('INSERT INTO dates (date) VALUES (?)').run(date);
-    return NextResponse.json({ id: result.lastInsertRowid, date }, { status: 201 });
-  } catch (error) {
+    const result = await db.execute({ sql: 'INSERT INTO dates (date) VALUES (?)', args: [date] });
+    return NextResponse.json({ id: Number(result.lastInsertRowid), date }, { status: 201 });
+  } catch {
     return NextResponse.json({ error: 'Failed to create date' }, { status: 500 });
   }
 }
@@ -33,9 +33,9 @@ export async function PUT(request: Request) {
     const { id, date } = await request.json();
     if (!id || !date) return NextResponse.json({ error: 'ID and date are required' }, { status: 400 });
 
-    db.prepare('UPDATE dates SET date = ? WHERE id = ?').run(date, id);
+    await db.execute({ sql: 'UPDATE dates SET date = ? WHERE id = ?', args: [date, id] });
     return NextResponse.json({ message: 'Date updated' });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to update date' }, { status: 500 });
   }
 }
@@ -49,9 +49,9 @@ export async function DELETE(request: Request) {
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
 
-    db.prepare('DELETE FROM dates WHERE id = ?').run(Number(id));
+    await db.execute({ sql: 'DELETE FROM dates WHERE id = ?', args: [Number(id)] });
     return NextResponse.json({ message: 'Date deleted' });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to delete date' }, { status: 500 });
   }
 }

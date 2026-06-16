@@ -1,27 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import db from '@/lib/db';
+import db, { rowsToObjects } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const dateId = searchParams.get('date_id');
 
-  let slots;
+  let result;
   if (dateId) {
-    slots = db
-      .prepare('SELECT * FROM slots WHERE date_id = ? ORDER BY time ASC')
-      .all(Number(dateId));
+    result = await db.execute({
+      sql: 'SELECT * FROM slots WHERE date_id = ? ORDER BY time ASC',
+      args: [Number(dateId)],
+    });
   } else {
-    slots = db
-      .prepare(
-        `SELECT s.*, d.date FROM slots s 
-         JOIN dates d ON s.date_id = d.id 
-         ORDER BY d.date DESC, s.time ASC`
-      )
-      .all();
+    result = await db.execute({
+      sql: `SELECT s.*, d.date FROM slots s 
+           JOIN dates d ON s.date_id = d.id 
+           ORDER BY d.date DESC, s.time ASC`,
+    });
   }
 
-  return NextResponse.json(slots);
+  return NextResponse.json(rowsToObjects(result));
 }
 
 export async function POST(request: Request) {
@@ -34,12 +33,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'date_id, time, and capacity are required' }, { status: 400 });
     }
 
-    const result = db
-      .prepare('INSERT INTO slots (date_id, time, capacity, available) VALUES (?, ?, ?, ?)')
-      .run(date_id, time, capacity, capacity);
+    const result = await db.execute({
+      sql: 'INSERT INTO slots (date_id, time, capacity, available) VALUES (?, ?, ?, ?)',
+      args: [date_id, time, capacity, capacity],
+    });
 
     return NextResponse.json(
-      { id: result.lastInsertRowid, date_id, time, capacity },
+      { id: Number(result.lastInsertRowid), date_id, time, capacity },
       { status: 201 }
     );
   } catch {
@@ -67,7 +67,10 @@ export async function PUT(request: Request) {
     }
 
     values.push(id);
-    db.prepare(`UPDATE slots SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+    await db.execute({
+      sql: `UPDATE slots SET ${updates.join(', ')} WHERE id = ?`,
+      args: values,
+    });
 
     return NextResponse.json({ message: 'Slot updated' });
   } catch {
@@ -84,7 +87,7 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
 
-    db.prepare('DELETE FROM slots WHERE id = ?').run(Number(id));
+    await db.execute({ sql: 'DELETE FROM slots WHERE id = ?', args: [Number(id)] });
     return NextResponse.json({ message: 'Slot deleted' });
   } catch {
     return NextResponse.json({ error: 'Failed to delete slot' }, { status: 500 });

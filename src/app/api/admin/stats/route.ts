@@ -6,36 +6,31 @@ export async function GET() {
   const email = await getAdminSession();
   if (!email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const totalBookings = db
-    .prepare("SELECT COUNT(*) as count FROM bookings WHERE payment_status = 'confirmed'")
-    .get() as any;
-
-  const totalPayments = db
-    .prepare('SELECT COALESCE(SUM(amount), 0) as total FROM bookings')
-    .get() as any;
-
-  const activeSlots = db
-    .prepare('SELECT COUNT(*) as count FROM slots WHERE enabled = 1')
-    .get() as any;
-
-  const revenue = db
-    .prepare("SELECT COALESCE(SUM(amount), 0) as total FROM bookings WHERE payment_status = 'confirmed'")
-    .get() as any;
-
-  const pendingBookings = db
-    .prepare("SELECT COUNT(*) as count FROM bookings WHERE payment_status = 'pending'")
-    .get() as any;
-
-  const totalPassengers = db
-    .prepare("SELECT COUNT(*) as count FROM passengers")
-    .get() as any;
+  const totalBookingsResult = await db.execute({
+    sql: "SELECT COUNT(*) as cnt FROM bookings WHERE payment_status = 'confirmed'",
+  });
+  const totalPaymentsResult = await db.execute({
+    sql: 'SELECT COALESCE(SUM(amount), 0) as total FROM bookings',
+  });
+  const activeSlotsResult = await db.execute({
+    sql: 'SELECT COUNT(*) as cnt FROM slots WHERE enabled = 1',
+  });
+  const revenueResult = await db.execute({
+    sql: "SELECT COALESCE(SUM(amount), 0) as total FROM bookings WHERE payment_status = 'confirmed'",
+  });
+  const pendingBookingsResult = await db.execute({
+    sql: "SELECT COUNT(*) as cnt FROM bookings WHERE payment_status = 'pending'",
+  });
+  const totalPassengersResult = await db.execute({
+    sql: 'SELECT COUNT(*) as cnt FROM passengers',
+  });
 
   return NextResponse.json({
-    totalBookings: totalBookings.count,
-    totalPayments: totalPayments.total,
-    activeSlots: activeSlots.count,
-    revenue: revenue.total,
-    pendingBookings: pendingBookings.count,
-    totalPassengers: totalPassengers.count,
+    totalBookings: Number(totalBookingsResult.rows[0].cnt),
+    totalPayments: Number(totalPaymentsResult.rows[0].total),
+    activeSlots: Number(activeSlotsResult.rows[0].cnt),
+    revenue: Number(revenueResult.rows[0].total),
+    pendingBookings: Number(pendingBookingsResult.rows[0].cnt),
+    totalPassengers: Number(totalPassengersResult.rows[0].cnt),
   });
 }

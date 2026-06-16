@@ -10,19 +10,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
     }
 
-    const admin = db.prepare('SELECT * FROM admin WHERE email = ?').get(email) as any;
-    if (!admin) {
+    const adminResult = await db.execute({
+      sql: 'SELECT * FROM admin WHERE email = ?',
+      args: [email],
+    });
+    if (adminResult.rows.length === 0) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    const valid = await verifyPassword(password, admin.password_hash);
+    const admin = adminResult.rows[0];
+    const valid = await verifyPassword(password, admin.password_hash as string);
     if (!valid) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
     await createAdminSession(email);
     return NextResponse.json({ message: 'Login successful' });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Login failed' }, { status: 500 });
   }
 }

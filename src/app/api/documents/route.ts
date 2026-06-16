@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import db from '@/lib/db';
+import db, { rowsToObjects } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth';
 import fs from 'fs';
 import { getDocumentPath } from '@/lib/document';
@@ -26,18 +26,17 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const bookings = db
-    .prepare(
-      `SELECT b.booking_id, b.passenger_count, b.payment_status, b.amount, b.created_at, d.date, s.time
-       FROM bookings b
-       JOIN dates d ON b.date_id = d.id
-       JOIN slots s ON b.slot_id = s.id
-       WHERE b.payment_status = 'confirmed'
-       ORDER BY b.created_at DESC`
-    )
-    .all();
+  const result = await db.execute({
+    sql: `SELECT b.booking_id, b.passenger_count, b.payment_status, b.amount, b.created_at, d.date, s.time
+         FROM bookings b
+         JOIN dates d ON b.date_id = d.id
+         JOIN slots s ON b.slot_id = s.id
+         WHERE b.payment_status = 'confirmed'
+         ORDER BY b.created_at DESC`,
+  });
 
-  const documents = (bookings as any[]).map((b) => ({
+  const bookings = rowsToObjects(result) as Record<string, unknown>[];
+  const documents = bookings.map((b) => ({
     booking_id: b.booking_id,
     date: b.date,
     time: b.time,
@@ -45,7 +44,7 @@ export async function GET(request: NextRequest) {
     amount: b.amount,
     payment_status: b.payment_status,
     created_at: b.created_at,
-    has_document: fs.existsSync(getDocumentPath(b.booking_id)),
+    has_document: fs.existsSync(getDocumentPath(b.booking_id as string)),
   }));
 
   return NextResponse.json(documents);

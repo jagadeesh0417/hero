@@ -7,16 +7,22 @@ export async function GET() {
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@sumantravels.com';
     const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
 
-    const existing = db.prepare('SELECT id FROM admin WHERE email = ?').get(adminEmail);
-    if (existing) {
+    const existing = await db.execute({
+      sql: 'SELECT id FROM admin WHERE email = ?',
+      args: [adminEmail],
+    });
+    if (existing.rows.length > 0) {
       return NextResponse.json({ message: 'Admin already exists' });
     }
 
     const passwordHash = await hashPassword(adminPassword);
-    db.prepare('INSERT INTO admin (email, password_hash) VALUES (?, ?)').run(adminEmail, passwordHash);
+    await db.execute({
+      sql: 'INSERT INTO admin (email, password_hash) VALUES (?, ?)',
+      args: [adminEmail, passwordHash],
+    });
 
     return NextResponse.json({ message: 'Admin created successfully' });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Seed failed' }, { status: 500 });
   }
 }
