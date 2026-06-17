@@ -33,6 +33,21 @@ function toHranaValue(v: string | number | null | undefined): Record<string, unk
   return { type: 'text', value: v };
 }
 
+function extractColumns(r: any): string[] {
+  if (r.cols && Array.isArray(r.cols)) {
+    return r.cols.map((c: any) => (typeof c === 'string' ? c : c.name || ''));
+  }
+  return r.columns || [];
+}
+
+function decodeCell(val: any): any {
+  if (val === null || val === undefined) return null;
+  if (typeof val !== 'object' || Array.isArray(val)) return val;
+  if (val.type === 'null') return null;
+  if (val.type === 'integer' || val.type === 'float') return Number(val.value);
+  return val.value;
+}
+
 function encodeArgs(args?: (string | number)[]): Record<string, unknown>[] {
   return (args || []).map(toHranaValue);
 }
@@ -92,11 +107,11 @@ class DirectTursoClient {
     const r = first.response?.result;
     if (!r) throw new Error('Unexpected Turso response');
 
-    const columns = r.columns || [];
+    const columns = extractColumns(r);
     const rawRows = r.rows || [];
     const rows = rawRows.map((row: unknown[]) => {
       const obj: Record<string, unknown> = {};
-      for (let i = 0; i < columns.length; i++) obj[columns[i]] = row[i];
+      for (let i = 0; i < columns.length; i++) obj[columns[i]] = decodeCell((row as any[])[i]);
       return obj;
     });
 
@@ -167,9 +182,16 @@ class DirectTursoTransaction {
     const r = first.response?.result;
     if (!r) return { columns: [], rows: [] };
 
+    const txnCols = extractColumns(r);
+    const txnRows = (r.rows || []).map((row: unknown[]) => {
+      const obj: Record<string, unknown> = {};
+      for (let i = 0; i < txnCols.length; i++) obj[txnCols[i]] = decodeCell((row as any[])[i]);
+      return obj;
+    });
+
     return {
-      columns: r.columns,
-      rows: r.rows,
+      columns: txnCols,
+      rows: txnRows,
       lastInsertRowid: r.last_insert_rowid != null ? Number(r.last_insert_rowid) : undefined,
     };
   }
@@ -218,7 +240,7 @@ export function rowsToObjects(result: any): Record<string, unknown>[] {
   return (result.rows || []).map((row: any) => {
     const obj: Record<string, unknown> = {};
     for (let i = 0; i < cols.length; i++) {
-      obj[cols[i]] = typeof row === 'object' && !Array.isArray(row) ? row[cols[i]] : row[i];
+      obj[cols[i]] = typeof row === 'object' && !Array.isArray(row) ? row[cols[i]] : decodeCell(row[i]);
     }
     return obj;
   });
@@ -230,7 +252,7 @@ export function rowToObject(result: any): Record<string, unknown> | null {
   const row = result.rows[0];
   const obj: Record<string, unknown> = {};
   for (let i = 0; i < cols.length; i++) {
-    obj[cols[i]] = typeof row === 'object' && !Array.isArray(row) ? row[cols[i]] : row[i];
+    obj[cols[i]] = typeof row === 'object' && !Array.isArray(row) ? row[cols[i]] : decodeCell(row[i]);
   }
   return obj;
 }
