@@ -18,6 +18,7 @@ export async function GET() {
     return NextResponse.json({ message: 'Admin created successfully' });
   } catch (err: any) {
     console.error('[API /seed] GET error:', err?.message || err);
-    return NextResponse.json({ error: 'Seed failed' }, { status: 500 });
+    const msg = err?.message || String(err || 'Unknown error');
+    return NextResponse.json({ error: 'Seed failed', detail: msg }, { status: 500 });
   }
 }

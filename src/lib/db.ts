@@ -5,7 +5,6 @@ const TURSO_URL = process.env.TURSO_DATABASE_URL || '';
 const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN || '';
 const isTurso = !!TURSO_URL;
 
-// Convert libsql:// to https:// for HTTP-only transport (works on all serverless platforms)
 function normalizeUrl(url: string): string {
   if (url.startsWith('libsql://')) return 'https://' + url.slice(9);
   return url;
@@ -21,43 +20,204 @@ function getDbUrl(): string {
   return `file:${dbPath}`;
 }
 
-// On Vercel/Turso: use @libsql/client/web (pure fetch, no native deps).
-// Locally without Turso: use @libsql/client (supports file: protocol).
-async function createClientAsync() {
-  const url = getDbUrl();
-  if (isTurso) {
-    const mod = await import('@libsql/client/web');
-    return mod.createClient({ url, authToken: TURSO_TOKEN });
+// ---------------------------------------------------------------------------
+// Direct Turso HTTP client (hrana v2 over HTTP via raw fetch)
+// ---------------------------------------------------------------------------
+interface TursoStmt {
+  sql: string;
+  args: (string | number)[];
+  named_args: string[];
+  want_rows: boolean;
+}
+
+interface TursoRequest {
+  type: 'execute' | 'close';
+  stmt?: TursoStmt;
+}
+
+interface TursoResponse {
+  baton?: string | null;
+  base_url?: string | null;
+  results: Array<{
+    type: 'ok' | 'error';
+    response?: { type: string; result?: TursoResult };
+    error?: { message: string };
+  }>;
+}
+
+interface TursoResult {
+  columns: string[];
+  rows: unknown[][];
+  affected_row_count?: number;
+  last_insert_rowid?: string | number | null;
+}
+
+export type ResultSet = {
+  columns: string[];
+  rows: any[];
+  lastInsertRowid?: number | null;
+};
+
+class DirectTursoClient {
+  private url: string;
+  private token: string;
+
+  constructor(url: string, token: string) {
+    this.url = url.replace(/\/+$/, '');
+    this.token = token;
   }
+
+  async execute({ sql, args }: { sql: string; args?: (string | number)[] }): Promise<ResultSet> {
+    const resp = await this._pipeline([
+      { type: 'execute', stmt: { sql, args: args || [], named_args: [], want_rows: true } },
+      { type: 'close' },
+    ]);
+
+    const first = resp.results[0];
+    if (!first || first.type === 'error') {
+      throw new Error(first?.error?.message || 'Turso execute failed');
+    }
+    const r = first.response?.result;
+    if (!r) throw new Error('Unexpected Turso response');
+
+    const columns = r.columns;
+    const rows = r.rows.map((row: unknown[]) => {
+      const obj: Record<string, unknown> = {};
+      for (let i = 0; i < columns.length; i++) obj[columns[i]] = row[i];
+      return obj;
+    });
+
+    return {
+      columns,
+      rows,
+      lastInsertRowid: r.last_insert_rowid != null ? Number(r.last_insert_rowid) : undefined,
+    };
+  }
+
+  async transaction(_mode: string): Promise<DirectTursoTransaction> {
+    return new DirectTursoTransaction(this);
+  }
+
+  close() {}
+
+  /** @private Send pipeline, optionally with a baton. Returns full response body. */
+  async _pipeline(requests: TursoRequest[], baton?: string | null): Promise<TursoResponse> {
+    const body: Record<string, unknown> = { requests };
+    if (baton) body.baton = baton;
+
+    const res = await fetch(`${this.url}/v2/pipeline`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`Turso HTTP ${res.status}: ${text || res.statusText}`);
+    }
+
+    return res.json() as Promise<TursoResponse>;
+  }
+}
+
+class DirectTursoTransaction {
+  private client: DirectTursoClient;
+  private baton: string | null | undefined;
+  private _opened = false;
+  private _closed = false;
+
+  constructor(client: DirectTursoClient) {
+    this.client = client;
+  }
+
+  async execute({ sql, args }: { sql: string; args?: (string | number)[] }): Promise<ResultSet> {
+    if (!this._opened) {
+      const resp = await this.client._pipeline([
+        { type: 'execute', stmt: { sql: 'BEGIN', args: [], named_args: [], want_rows: false } },
+      ]);
+      this.baton = resp.baton;
+      this._opened = true;
+    }
+
+    const resp = await this.client._pipeline([
+      { type: 'execute', stmt: { sql, args: args || [], named_args: [], want_rows: true } },
+    ], this.baton);
+    this.baton = resp.baton;
+
+    const first = resp.results[0];
+    if (!first || first.type === 'error') {
+      throw new Error(first?.error?.message || 'Turso execute failed');
+    }
+    const r = first.response?.result;
+    if (!r) return { columns: [], rows: [] };
+
+    return {
+      columns: r.columns,
+      rows: r.rows,
+      lastInsertRowid: r.last_insert_rowid != null ? Number(r.last_insert_rowid) : undefined,
+    };
+  }
+
+  async commit(): Promise<void> {
+    if (this._closed) return;
+    this._closed = true;
+    await this.client._pipeline([
+      { type: 'execute', stmt: { sql: 'COMMIT', args: [], named_args: [], want_rows: false } },
+      { type: 'close' },
+    ], this.baton);
+  }
+
+  async rollback(): Promise<void> {
+    if (this._closed) return;
+    this._closed = true;
+    await this.client._pipeline([
+      { type: 'execute', stmt: { sql: 'ROLLBACK', args: [], named_args: [], want_rows: false } },
+      { type: 'close' },
+    ], this.baton);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Local SQLite fallback via @libsql/client
+// ---------------------------------------------------------------------------
+type LibsqlClient = Awaited<ReturnType<typeof import('@libsql/client')['createClient']>>;
+
+async function createLocalClient(): Promise<LibsqlClient> {
+  const url = getDbUrl();
   const mod = await import('@libsql/client');
   return mod.createClient({ url });
 }
 
-type Client = Awaited<ReturnType<typeof createClientAsync>>;
-type ResultSet = any;
+// ---------------------------------------------------------------------------
+// Unified client
+// ---------------------------------------------------------------------------
+type Client = DirectTursoClient | LibsqlClient;
 
 let client: Client | null = null;
 let schemaReady = false;
 let initPromise: Promise<void> | null = null;
 
-export function rowsToObjects(result: ResultSet): Record<string, unknown>[] {
-  const cols = result.columns;
-  return result.rows.map((row: any) => {
+export function rowsToObjects(result: any): Record<string, unknown>[] {
+  const cols: string[] = result.columns || [];
+  return (result.rows || []).map((row: any) => {
     const obj: Record<string, unknown> = {};
     for (let i = 0; i < cols.length; i++) {
-      obj[cols[i]] = row[i];
+      obj[cols[i]] = typeof row === 'object' && !Array.isArray(row) ? row[cols[i]] : row[i];
     }
     return obj;
   });
 }
 
-export function rowToObject(result: ResultSet): Record<string, unknown> | null {
-  if (result.rows.length === 0) return null;
-  const cols = result.columns;
-  const row: any = result.rows[0];
+export function rowToObject(result: any): Record<string, unknown> | null {
+  if (!result || !result.rows || result.rows.length === 0) return null;
+  const cols: string[] = result.columns || [];
+  const row = result.rows[0];
   const obj: Record<string, unknown> = {};
   for (let i = 0; i < cols.length; i++) {
-    obj[cols[i]] = row[i];
+    obj[cols[i]] = typeof row === 'object' && !Array.isArray(row) ? row[cols[i]] : row[i];
   }
   return obj;
 }
@@ -66,9 +226,7 @@ async function ensureSchema(): Promise<void> {
   if (schemaReady) return;
   console.log('[DB] Initializing schema...');
 
-  if (!client) {
-    throw new Error('Database client not initialized');
-  }
+  if (!client) throw new Error('Database client not initialized');
 
   const tables = [
     `CREATE TABLE IF NOT EXISTS admin (
@@ -86,8 +244,6 @@ async function ensureSchema(): Promise<void> {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       date_id INTEGER NOT NULL,
       time TEXT NOT NULL,
-      capacity INTEGER NOT NULL DEFAULT 10,
-      available INTEGER NOT NULL DEFAULT 10,
       enabled INTEGER NOT NULL DEFAULT 1,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (date_id) REFERENCES dates(id) ON DELETE CASCADE
@@ -136,7 +292,6 @@ async function ensureSchema(): Promise<void> {
   try {
     await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN utr_number TEXT DEFAULT ''" });
   } catch {
-    // column already exists
   }
 
   const defaultSettings: Record<string, string> = {
@@ -165,12 +320,17 @@ async function ensureSchema(): Promise<void> {
 
 export async function getDb(): Promise<Client> {
   if (!client) {
-    client = await createClientAsync();
+    if (isTurso) {
+      console.log('[DB] Creating direct Turso HTTP client');
+      client = new DirectTursoClient(getDbUrl(), TURSO_TOKEN);
+    } else {
+      client = await createLocalClient();
+    }
   }
   if (!initPromise) {
     initPromise = ensureSchema().catch((err) => {
       console.error('[DB] Schema init failed:', err?.message || err);
-      initPromise = null; // allow retry
+      initPromise = null;
       schemaReady = false;
       throw err;
     });
@@ -179,7 +339,7 @@ export async function getDb(): Promise<Client> {
   return client;
 }
 
-export async function dbExecute(sql: string, args?: (string | number)[]): Promise<ResultSet> {
+export async function dbExecute(sql: string, args?: (string | number)[]): Promise<any> {
   const db = await getDb();
   try {
     return await db.execute({ sql, args });

@@ -30,18 +30,18 @@ export async function POST(request: Request) {
   if (!email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const { date_id, time, capacity } = await request.json();
-    if (!date_id || !time || !capacity) {
-      return NextResponse.json({ error: 'date_id, time, and capacity are required' }, { status: 400 });
+    const { date_id, time } = await request.json();
+    if (!date_id || !time) {
+      return NextResponse.json({ error: 'date_id and time are required' }, { status: 400 });
     }
 
     const result = await dbExecute(
-      'INSERT INTO slots (date_id, time, capacity, available) VALUES (?, ?, ?, ?)',
-      [date_id, time, capacity, capacity]
+      'INSERT INTO slots (date_id, time) VALUES (?, ?)',
+      [date_id, time]
     );
 
     return NextResponse.json(
-      { id: Number(result.lastInsertRowid), date_id, time, capacity },
+      { id: Number(result.lastInsertRowid), date_id, time },
       { status: 201 }
     );
   } catch (err: any) {
@@ -55,14 +55,13 @@ export async function PUT(request: Request) {
   if (!email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const { id, time, capacity, enabled } = await request.json();
+    const { id, time, enabled } = await request.json();
     if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
 
     const updates: string[] = [];
     const values: (string | number)[] = [];
 
     if (time !== undefined) { updates.push('time = ?'); values.push(time); }
-    if (capacity !== undefined) { updates.push('capacity = ?', 'available = ?'); values.push(capacity, capacity); }
     if (enabled !== undefined) { updates.push('enabled = ?'); values.push(enabled ? 1 : 0); }
 
     if (updates.length === 0) {

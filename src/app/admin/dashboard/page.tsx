@@ -109,7 +109,7 @@ export default function AdminDashboard() {
           </div>
           <div>
             <h3 className="font-bold text-gray-900">Manage Slots</h3>
-            <p className="text-sm text-gray-500">Configure time slots and capacity</p>
+            <p className="text-sm text-gray-500">Configure time slots</p>
           </div>
         </Link>
 

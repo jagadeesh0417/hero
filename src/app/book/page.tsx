@@ -13,8 +13,6 @@ interface SlotOption {
   id: number;
   date_id: number;
   time: string;
-  capacity: number;
-  available: number;
   enabled: number;
 }
 
@@ -87,7 +85,7 @@ function StepSelectSlot({
     const data = await res.json();
     setSlots(
       (data as SlotOption[]).filter(
-        (s) => s.enabled === 1 && s.available > 0
+        (s) => s.enabled === 1
       )
     );
   }, []);
@@ -181,12 +179,6 @@ function StepSelectSlot({
                 >
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-bold text-gray-900">{s.time}</span>
-                    <span className="text-xs px-2 py-0.5 bg-green-50 text-green-600 rounded-full font-medium">
-                      {s.available} seats
-                    </span>
-                  </div>
-                  <div className="text-xs text-gray-400">
-                    Capacity: {s.capacity}
                   </div>
                 </button>
               ))}
@@ -650,7 +642,7 @@ export default function BookPage() {
   const [selectedDateStr, setSelectedDateStr] = useState('');
   const [selectedTimeStr, setSelectedTimeStr] = useState('');
   const [ticketCount, setTicketCount] = useState(1);
-  const [maxTickets, setMaxTickets] = useState(1);
+  const maxTickets = 100;
   const [passengers, setPassengers] = useState<PassengerForm[]>([]);
   const [processing, setProcessing] = useState(false);
   const [bookingId, setBookingId] = useState<string | null>(null);
@@ -696,7 +688,6 @@ export default function BookPage() {
     const slotObj = slots.find((s: any) => s.id === slotId);
     if (slotObj) {
       setSelectedTimeStr(slotObj.time);
-      setMaxTickets(slotObj.available);
       setTicketCount(1);
     }
 
@@ -850,15 +841,11 @@ export default function BookPage() {
                   </div>
                   <button
                     onClick={() => setTicketCount(ticketCount + 1)}
-                    disabled={ticketCount >= maxTickets}
-                    className="w-12 h-12 rounded-xl border-2 border-gray-200 flex items-center justify-center text-xl font-bold text-gray-600 hover:border-[#1e3a5f] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="w-12 h-12 rounded-xl border-2 border-gray-200 flex items-center justify-center text-xl font-bold text-gray-600 hover:border-[#1e3a5f] transition-colors"
                   >
                     +
                   </button>
                 </div>
-                <p className="text-center text-sm text-gray-400">
-                  {maxTickets} seat{maxTickets > 1 ? 's' : ''} available
-                </p>
               </div>
               <div className="flex gap-3">
                 <button

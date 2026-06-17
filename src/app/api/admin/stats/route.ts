@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { dbExecute } from '@/lib/db';
+import { dbExecute, rowToObject } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth';
 
 export async function GET() {
@@ -18,12 +18,12 @@ export async function GET() {
       ]);
 
     return NextResponse.json({
-      totalBookings: Number(totalBookings.rows[0].cnt),
-      totalPayments: Number(totalPayments.rows[0].total),
-      activeSlots: Number(activeSlots.rows[0].cnt),
-      revenue: Number(revenue.rows[0].total),
-      pendingBookings: Number(pendingBookings.rows[0].cnt),
-      totalPassengers: Number(totalPassengers.rows[0].cnt),
+      totalBookings: Number(rowToObject(totalBookings)?.cnt || 0),
+      totalPayments: Number(rowToObject(totalPayments)?.total || 0),
+      activeSlots: Number(rowToObject(activeSlots)?.cnt || 0),
+      revenue: Number(rowToObject(revenue)?.total || 0),
+      pendingBookings: Number(rowToObject(pendingBookings)?.cnt || 0),
+      totalPassengers: Number(rowToObject(totalPassengers)?.cnt || 0),
     });
   } catch (err: any) {
     console.error('[API /admin/stats] GET error:', err?.message || err);

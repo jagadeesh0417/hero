@@ -11,8 +11,6 @@ interface SlotRecord {
   id: number;
   date_id: number;
   time: string;
-  capacity: number;
-  available: number;
   enabled: number;
   date?: string;
 }
@@ -22,10 +20,8 @@ export default function AdminSlots() {
   const [dates, setDates] = useState<DateRecord[]>([]);
   const [selectedDateId, setSelectedDateId] = useState('');
   const [newTime, setNewTime] = useState('');
-  const [newCapacity, setNewCapacity] = useState('30');
   const [editId, setEditId] = useState<number | null>(null);
   const [editTime, setEditTime] = useState('');
-  const [editCapacity, setEditCapacity] = useState('');
 
   const loadData = () => {
     fetch('/api/slots')
@@ -40,7 +36,7 @@ export default function AdminSlots() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedDateId || !newTime || !newCapacity) return;
+    if (!selectedDateId || !newTime) return;
 
     const res = await fetch('/api/slots', {
       method: 'POST',
@@ -48,13 +44,11 @@ export default function AdminSlots() {
       body: JSON.stringify({
         date_id: Number(selectedDateId),
         time: newTime,
-        capacity: Number(newCapacity),
       }),
     });
 
     if (res.ok) {
       setNewTime('');
-      setNewCapacity('30');
       loadData();
     } else {
       const err = await res.json();
@@ -69,7 +63,6 @@ export default function AdminSlots() {
       body: JSON.stringify({
         id,
         time: editTime,
-        capacity: Number(editCapacity),
       }),
     });
 
@@ -101,7 +94,7 @@ export default function AdminSlots() {
 
       <form onSubmit={handleCreate} className="glass-card p-6 mb-6">
         <h2 className="font-bold text-gray-900 mb-4">Create New Slot</h2>
-        <div className="grid sm:grid-cols-3 gap-4">
+        <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
             <select
@@ -133,17 +126,6 @@ export default function AdminSlots() {
               required
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Capacity</label>
-            <input
-              type="number"
-              value={newCapacity}
-              onChange={(e) => setNewCapacity(e.target.value)}
-              className="input-field"
-              min="1"
-              required
-            />
-          </div>
         </div>
         <button type="submit" className="btn-primary mt-4">
           Create Slot
@@ -157,8 +139,6 @@ export default function AdminSlots() {
               <tr className="bg-gray-50">
                 <th className="text-left p-4 text-sm font-semibold text-gray-700">Date</th>
                 <th className="text-left p-4 text-sm font-semibold text-gray-700">Time</th>
-                <th className="text-center p-4 text-sm font-semibold text-gray-700">Capacity</th>
-                <th className="text-center p-4 text-sm font-semibold text-gray-700">Available</th>
                 <th className="text-center p-4 text-sm font-semibold text-gray-700">Status</th>
                 <th className="text-right p-4 text-sm font-semibold text-gray-700">Actions</th>
               </tr>
@@ -166,7 +146,7 @@ export default function AdminSlots() {
             <tbody>
               {slots.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-gray-500">
+                  <td colSpan={4} className="p-8 text-center text-gray-500">
                     No slots created yet
                   </td>
                 </tr>
@@ -196,24 +176,6 @@ export default function AdminSlots() {
                     ) : (
                       <span className="font-medium text-gray-900">{s.time}</span>
                     )}
-                  </td>
-                  <td className="p-4 text-center">
-                    {editId === s.id ? (
-                      <input
-                        type="number"
-                        value={editCapacity}
-                        onChange={(e) => setEditCapacity(e.target.value)}
-                        className="input-field w-20 text-center"
-                        min="1"
-                      />
-                    ) : (
-                      <span className="text-gray-900">{s.capacity}</span>
-                    )}
-                  </td>
-                  <td className="p-4 text-center">
-                    <span className={`font-medium ${s.available > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                      {s.available}
-                    </span>
                   </td>
                   <td className="p-4 text-center">
                     <button
@@ -247,7 +209,7 @@ export default function AdminSlots() {
                       ) : (
                         <>
                           <button
-                            onClick={() => { setEditId(s.id); setEditTime(s.time); setEditCapacity(String(s.capacity)); }}
+                            onClick={() => { setEditId(s.id); setEditTime(s.time); }}
                             className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100"
                           >
                             Edit

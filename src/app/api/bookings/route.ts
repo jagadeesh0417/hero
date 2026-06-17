@@ -63,13 +63,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Slot not found or disabled' }, { status: 400 });
     }
 
-    const slot = slotResult.rows[0] as any;
-    const available = Number(slot.available);
-
-    if (available < passengers.length) {
-      return NextResponse.json({ error: 'Not enough available seats' }, { status: 400 });
-    }
-
     const priceResult = await dbExecute("SELECT value FROM settings WHERE key = 'price_per_ticket'");
     const priceRow = priceResult.rows[0] as any;
     const pricePerTicket = priceRow ? Number(priceRow.value) : 500;
@@ -90,16 +83,6 @@ export async function POST(request: Request) {
           args: [bookingId, p.name, p.mobile, p.gender],
         });
       }
-
-      await tx.execute({
-        sql: 'UPDATE slots SET available = available - ? WHERE id = ?',
-        args: [passengers.length, slot_id],
-      });
-
-      await tx.execute({
-        sql: "UPDATE slots SET enabled = CASE WHEN available <= 0 THEN 0 ELSE enabled END WHERE id = ?",
-        args: [slot_id],
-      });
 
       await tx.commit();
     } catch (e) {

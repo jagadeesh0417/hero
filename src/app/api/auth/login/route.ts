@@ -25,6 +25,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Login successful' });
   } catch (err: any) {
     console.error('[API /auth/login] POST error:', err?.message || err);
-    return NextResponse.json({ error: 'Login failed' }, { status: 500 });
+    const msg = err?.message || String(err || 'Unknown error');
+    return NextResponse.json({ error: 'Login failed', detail: msg }, { status: 500 });
   }
 }
