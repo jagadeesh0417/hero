@@ -17,6 +17,7 @@ import {
 } from 'docx';
 import fs from 'fs';
 import path from 'path';
+import { to12h } from './slots';
 
 const BUSINESS_NAME = 'SUMAN TRAVELS';
 const PHONE = '+91 9848579053';
@@ -257,7 +258,7 @@ export async function generateBookingDocument(
             ? [new Paragraph({
                 children: [
                   new TextRun({ text: `Vehicle Start: `, bold: true, size: 20 }),
-                  new TextRun({ text: `${data.vehicleTime}`, size: 20, color: 'CC5500' }),
+                  new TextRun({ text: `${to12h(data.vehicleTime || '')}`, size: 20, color: 'CC5500' }),
                 ],
                 spacing: { after: 60 },
               })]

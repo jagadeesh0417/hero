@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import QRCode from 'qrcode';
 
-import { slotLabel } from '@/lib/slots';
+import { slotLabel, to12h } from '@/lib/slots';
 
 interface DateOption {
   id: number;
@@ -188,7 +188,7 @@ function StepSelectSlot({
                   </div>
                   {s.vehicle_time && (
                     <div className="mt-2 text-xs text-orange-600 font-medium">
-                      Vehicle @ {s.vehicle_time}
+                      Vehicle @ {to12h(s.vehicle_time)}
                     </div>
                   )}
                 </button>
@@ -412,7 +412,7 @@ function StepSummary({
           {selectedVehicleTime && (
             <div className="flex justify-between">
               <span className="text-gray-500">Vehicle</span>
-              <span className="font-semibold text-orange-600">{selectedVehicleTime}</span>
+              <span className="font-semibold text-orange-600">{to12h(selectedVehicleTime)}</span>
             </div>
           )}
           <div className="flex justify-between">

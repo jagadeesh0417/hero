@@ -10,3 +10,15 @@ export const SLOT_LABEL_MAP = Object.fromEntries(EXAM_TIMINGS.map((t) => [t.valu
 export function slotLabel(time: string): string {
   return SLOT_LABEL_MAP[time] || time;
 }
+
+export function to12h(time: string): string {
+  if (!time) return '';
+  const parts = time.split(':');
+  if (parts.length < 2) return time;
+  const h = parseInt(parts[0], 10);
+  const m = parts[1];
+  if (isNaN(h)) return time;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${m} ${ampm}`;
+}
