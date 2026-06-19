@@ -215,11 +215,13 @@ function StepSelectSlot({
 function StepPassengerDetails({
   ticketCount,
   pricePerTicket,
+  vehicleTime,
   onBack,
   onNext,
 }: {
   ticketCount: number;
   pricePerTicket: number;
+  vehicleTime: string;
   onBack: () => void;
   onNext: (passengers: PassengerForm[]) => void;
 }) {
@@ -273,6 +275,11 @@ function StepPassengerDetails({
           {(ticketCount * pricePerTicket).toLocaleString('en-IN')}
         </span>
       </div>
+      {vehicleTime && (
+        <p className="text-orange-600 text-sm font-medium mb-4">
+          Vehicle starts at {to12h(vehicleTime)}
+        </p>
+      )}
 
       <div className="space-y-6">
         {passengers.map((passenger, index) => (
@@ -841,9 +848,14 @@ export default function BookPage() {
               <h2 className="text-2xl font-bold text-[#1e3a5f] mb-2">
                 Number of Tickets
               </h2>
-              <p className="text-gray-500 mb-6">
+              <p className="text-gray-500 mb-1">
                 Selected: {selectedDateStr} at {slotLabel(selectedTimeStr)}
               </p>
+              {selectedVehicleTimeStr && (
+                <p className="text-orange-600 text-sm font-medium mb-6">
+                  Vehicle starts at {to12h(selectedVehicleTimeStr)}
+                </p>
+              )}
               <div className="max-w-xs mx-auto">
                 <div className="flex items-center gap-4 mb-6">
                   <button
@@ -889,6 +901,7 @@ export default function BookPage() {
             <StepPassengerDetails
               ticketCount={ticketCount}
               pricePerTicket={pricePerTicket}
+              vehicleTime={selectedVehicleTimeStr}
               onBack={() => setStep(1)}
               onNext={handlePassengersNext}
             />
