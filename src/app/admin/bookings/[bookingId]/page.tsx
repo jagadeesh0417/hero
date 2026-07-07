@@ -14,6 +14,7 @@ interface BookingDetail {
   booking_id: string;
   date: string;
   time: string;
+  exam_center?: string;
   passenger_count: number;
   amount: number;
   payment_status: string;
@@ -87,6 +88,12 @@ export default function BookingDetailPage({
               <span className="text-gray-500">Time</span>
               <span className="font-medium">{slotLabel(booking.time)}</span>
             </div>
+            {booking.exam_center && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Exam Center</span>
+                <span className="font-medium text-right max-w-[200px]">{booking.exam_center}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-gray-500">Passengers</span>
               <span className="font-medium">{booking.passenger_count}</span>

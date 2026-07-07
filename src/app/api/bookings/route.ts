@@ -43,10 +43,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: Request) {
   try {
-    const { date_id, slot_id, passengers } = await request.json();
+    const { date_id, slot_id, passengers, exam_center } = await request.json();
 
     if (!date_id || !slot_id || !passengers || !Array.isArray(passengers) || passengers.length === 0) {
       return NextResponse.json({ error: 'Invalid booking data' }, { status: 400 });
+    }
+
+    if (!exam_center) {
+      return NextResponse.json({ error: 'Exam center is required' }, { status: 400 });
     }
 
     for (const p of passengers) {
@@ -73,8 +77,8 @@ export async function POST(request: Request) {
     const tx = await db.transaction('write');
     try {
       await tx.execute({
-        sql: 'INSERT INTO bookings (booking_id, date_id, slot_id, passenger_count, amount, payment_status) VALUES (?, ?, ?, ?, ?, ?)',
-        args: [bookingId, date_id, slot_id, passengers.length, amount, 'pending'],
+        sql: 'INSERT INTO bookings (booking_id, date_id, slot_id, passenger_count, amount, payment_status, exam_center) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        args: [bookingId, date_id, slot_id, passengers.length, amount, 'pending', exam_center],
       });
 
       for (const p of passengers) {

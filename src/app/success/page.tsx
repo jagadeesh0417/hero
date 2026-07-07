@@ -11,6 +11,7 @@ interface BookingData {
   date: string;
   time: string;
   vehicle_time?: string;
+  exam_center?: string;
   passenger_count: number;
   amount: number;
   passengers: {
@@ -137,6 +138,12 @@ export default function SuccessPage({
               <div className="flex justify-between items-center py-2 border-b border-gray-50">
                 <span className="text-gray-500">Vehicle</span>
                 <span className="font-semibold text-orange-600">{to12h(booking.vehicle_time)}</span>
+              </div>
+            )}
+            {booking.exam_center && (
+              <div className="flex justify-between items-center py-2 border-b border-gray-50">
+                <span className="text-gray-500">Exam Center</span>
+                <span className="font-semibold">{booking.exam_center}</span>
               </div>
             )}
             <div className="flex justify-between items-center py-2 border-b border-gray-50">

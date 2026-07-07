@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import QRCode from 'qrcode';
 
-import { slotLabel, to12h } from '@/lib/slots';
+import { slotLabel, to12h, EXAM_CENTERS } from '@/lib/slots';
 
 interface DateOption {
   id: number;
@@ -223,7 +223,7 @@ function StepPassengerDetails({
   pricePerTicket: number;
   vehicleTime: string;
   onBack: () => void;
-  onNext: (passengers: PassengerForm[]) => void;
+  onNext: (passengers: PassengerForm[], examCenter: string) => void;
 }) {
   const [passengers, setPassengers] = useState<PassengerForm[]>(
     Array.from({ length: ticketCount }, () => ({
@@ -232,6 +232,7 @@ function StepPassengerDetails({
       gender: '',
     }))
   );
+  const [examCenter, setExamCenter] = useState('');
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   const updatePassenger = (
@@ -247,6 +248,7 @@ function StepPassengerDetails({
 
   const validate = () => {
     const newErrors: { [key: string]: string } = {};
+    if (!examCenter) newErrors['exam_center'] = 'Select exam center';
     passengers.forEach((p, i) => {
       if (!p.name.trim()) newErrors[`name_${i}`] = 'Name is required';
       if (!p.mobile.trim()) {
@@ -261,7 +263,7 @@ function StepPassengerDetails({
   };
 
   const handleSubmit = () => {
-    if (validate()) onNext(passengers);
+    if (validate()) onNext(passengers, examCenter);
   };
 
   return (
@@ -280,6 +282,25 @@ function StepPassengerDetails({
           Vehicle starts at {to12h(vehicleTime)}
         </p>
       )}
+
+      <div className="glass-card p-6 mb-6">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Exam Center <span className="text-red-500">*</span>
+        </label>
+        <select
+          value={examCenter}
+          onChange={(e) => { setExamCenter(e.target.value); setErrors({}); }}
+          className={`select-field ${errors['exam_center'] ? 'border-red-400' : ''}`}
+        >
+          <option value="">Select Exam Center</option>
+          {EXAM_CENTERS.map((center) => (
+            <option key={center} value={center}>{center}</option>
+          ))}
+        </select>
+        {errors['exam_center'] && (
+          <p className="text-xs text-red-500 mt-1">{errors['exam_center']}</p>
+        )}
+      </div>
 
       <div className="space-y-6">
         {passengers.map((passenger, index) => (
@@ -380,6 +401,7 @@ function StepSummary({
   selectedDate,
   selectedTime,
   selectedVehicleTime,
+  examCenter,
   passengers,
   pricePerTicket,
   onBack,
@@ -388,6 +410,7 @@ function StepSummary({
   selectedDate: string;
   selectedTime: string;
   selectedVehicleTime: string;
+  examCenter: string;
   passengers: PassengerForm[];
   pricePerTicket: number;
   onBack: () => void;
@@ -420,6 +443,12 @@ function StepSummary({
             <div className="flex justify-between">
               <span className="text-gray-500">Vehicle</span>
               <span className="font-semibold text-orange-600">{to12h(selectedVehicleTime)}</span>
+            </div>
+          )}
+          {examCenter && (
+            <div className="flex justify-between">
+              <span className="text-gray-500">Exam Center</span>
+              <span className="font-semibold">{examCenter}</span>
             </div>
           )}
           <div className="flex justify-between">
@@ -671,6 +700,7 @@ export default function BookPage() {
   const [ticketCount, setTicketCount] = useState(1);
   const maxTickets = 100;
   const [passengers, setPassengers] = useState<PassengerForm[]>([]);
+  const [examCenter, setExamCenter] = useState('');
   const [processing, setProcessing] = useState(false);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [settings, setSettings] = useState<{ upi_id: string; upi_name: string; price_per_ticket: string } | null>(null);
@@ -727,8 +757,9 @@ export default function BookPage() {
     setStep(2);
   };
 
-  const handlePassengersNext = (data: PassengerForm[]) => {
+  const handlePassengersNext = (data: PassengerForm[], center: string) => {
     setPassengers(data);
+    setExamCenter(center);
     setStep(3);
   };
 
@@ -744,6 +775,7 @@ export default function BookPage() {
           date_id: selectedDateId,
           slot_id: selectedSlotId,
           passengers,
+          exam_center: examCenter,
         }),
       });
 
@@ -912,6 +944,7 @@ export default function BookPage() {
               selectedDate={selectedDateStr}
               selectedTime={selectedTimeStr}
               selectedVehicleTime={selectedVehicleTimeStr}
+              examCenter={examCenter}
               passengers={passengers}
               pricePerTicket={pricePerTicket}
               onBack={() => setStep(2)}

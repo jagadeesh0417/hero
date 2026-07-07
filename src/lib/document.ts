@@ -36,6 +36,7 @@ interface BookingDocData {
   date: string;
   time: string;
   vehicleTime?: string;
+  examCenter?: string;
   passengerCount: number;
   amount: number;
   passengers: PassengerDoc[];
@@ -259,6 +260,15 @@ export async function generateBookingDocument(
                 children: [
                   new TextRun({ text: `Vehicle Start: `, bold: true, size: 20 }),
                   new TextRun({ text: `${to12h(data.vehicleTime || '')}`, size: 20, color: 'CC5500' }),
+                ],
+                spacing: { after: 60 },
+              })]
+            : []),
+          ...(data.examCenter
+            ? [new Paragraph({
+                children: [
+                  new TextRun({ text: `Exam Center: `, bold: true, size: 20 }),
+                  new TextRun({ text: `${data.examCenter}`, size: 20 }),
                 ],
                 spacing: { after: 60 },
               })]

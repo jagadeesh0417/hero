@@ -50,6 +50,7 @@ export async function POST(request: Request) {
         date: booking.date as string,
         time: booking.time as string,
         vehicleTime: (booking.vehicle_time as string) || undefined,
+        examCenter: (booking.exam_center as string) || undefined,
         passengerCount: booking.passenger_count as number,
         amount: booking.amount as number,
         passengers: passengers.map((p) => ({

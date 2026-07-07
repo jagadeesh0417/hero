@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
         date: booking.date as string,
         time: booking.time as string,
         vehicleTime: (booking.vehicle_time as string) || undefined,
+        examCenter: (booking.exam_center as string) || undefined,
         passengerCount: Number(booking.passenger_count),
         amount: Number(booking.amount),
         passengers,

@@ -1,3 +1,11 @@
+export const EXAM_CENTERS = [
+  'G. Pulla Reddy Engineering College',
+  'Brindavan Institute of Technology & Science',
+  'K. V. Subba Reddy Institute of Technology',
+  'Poojya Doddappa Appa Education Society',
+  'RGM College (Rajeev Gandhi Memorial College of Engineering & Technology)',
+];
+
 export const EXAM_TIMINGS = [
   { label: 'Slot 1 – 07:30 AM', value: '07:30' },
   { label: 'Slot 2 – 10:30 AM', value: '10:30' },

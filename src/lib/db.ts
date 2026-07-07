@@ -333,6 +333,10 @@ async function ensureSchema(): Promise<void> {
     await client.execute({ sql: "ALTER TABLE slots ADD COLUMN vehicle_time TEXT DEFAULT ''" });
   } catch {
   }
+  try {
+    await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN exam_center TEXT NOT NULL DEFAULT ''" });
+  } catch {
+  }
 
   const defaultSettings: Record<string, string> = {
     upi_id: '9848579053@paytm',
