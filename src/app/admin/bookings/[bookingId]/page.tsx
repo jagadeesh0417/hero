@@ -20,6 +20,9 @@ interface BookingDetail {
   payment_status: string;
   payment_id: string;
   utr_number: string;
+  bharatpe_order_id?: string;
+  bharatpe_txn_id?: string;
+  payment_timestamp?: string;
   created_at: string;
   passengers: Passenger[];
 }
@@ -114,6 +117,26 @@ export default function BookingDetailPage({
               <div className="flex justify-between">
                 <span className="text-gray-500">UTR Number</span>
                 <span className="font-mono text-sm text-gray-600">{booking.utr_number}</span>
+              </div>
+            )}
+            {booking.bharatpe_order_id && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">BharatPe Order</span>
+                <span className="font-mono text-sm text-gray-600">{booking.bharatpe_order_id}</span>
+              </div>
+            )}
+            {booking.bharatpe_txn_id && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">BharatPe Txn ID</span>
+                <span className="font-mono text-sm text-gray-600">{booking.bharatpe_txn_id}</span>
+              </div>
+            )}
+            {booking.payment_timestamp && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Payment Time</span>
+                <span className="text-sm text-gray-600">
+                  {new Date(booking.payment_timestamp).toLocaleString('en-IN')}
+                </span>
               </div>
             )}
             <div className="flex justify-between">

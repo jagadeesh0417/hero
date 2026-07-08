@@ -337,6 +337,18 @@ async function ensureSchema(): Promise<void> {
     await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN exam_center TEXT NOT NULL DEFAULT ''" });
   } catch {
   }
+  try {
+    await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN bharatpe_order_id TEXT DEFAULT ''" });
+  } catch {
+  }
+  try {
+    await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN bharatpe_txn_id TEXT DEFAULT ''" });
+  } catch {
+  }
+  try {
+    await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN payment_timestamp DATETIME DEFAULT NULL" });
+  } catch {
+  }
 
   const defaultSettings: Record<string, string> = {
     upi_id: '9848579053@paytm',

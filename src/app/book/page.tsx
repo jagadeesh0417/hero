@@ -1,9 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import QRCode from 'qrcode';
-
+import { Suspense, useState, useEffect, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { slotLabel, to12h, EXAM_CENTERS } from '@/lib/slots';
 
 interface DateOption {
@@ -546,156 +544,59 @@ function StepSummary({
   );
 }
 
-function StepUPIPayment({
+function StepBharatPePayment({
   amount,
   bookingRef,
-  upiId,
-  upiName,
   onBack,
-  onPaymentComplete,
+  onRetry,
+  paymentError,
   processing,
 }: {
   amount: number;
   bookingRef: string;
-  upiId: string;
-  upiName: string;
   onBack: () => void;
-  onPaymentComplete: (utr: string) => void;
+  onRetry: () => void;
+  paymentError: string;
   processing: boolean;
 }) {
-  const [qrDataUrl, setQrDataUrl] = useState('');
-  const [copied, setCopied] = useState(false);
-  const [utr, setUtr] = useState('');
-  const [utrError, setUtrError] = useState('');
-
-  const upiDeepLink = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(upiName)}&am=${amount}&tn=${bookingRef}&cu=INR`;
-
-  useEffect(() => {
-    QRCode.toDataURL(upiDeepLink, {
-      width: 280,
-      margin: 2,
-      color: { dark: '#1e3a5f', light: '#ffffff' },
-    }).then(setQrDataUrl);
-  }, [upiDeepLink]);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(upiId);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      const input = document.createElement('input');
-      input.value = upiId;
-      document.body.appendChild(input);
-      input.select();
-      document.execCommand('copy');
-      document.body.removeChild(input);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  const handleConfirm = () => {
-    const trimmed = utr.trim();
-    if (!trimmed) {
-      setUtrError('Enter the UPI transaction reference number');
-      return;
-    }
-    if (trimmed.length < 4) {
-      setUtrError('Enter a valid UTR number');
-      return;
-    }
-    setUtrError('');
-    onPaymentComplete(trimmed);
-  };
-
   return (
     <div className="animate-fade-in">
-      <h2 className="text-2xl font-bold text-[#1e3a5f] mb-2">Pay via UPI</h2>
+      <h2 className="text-2xl font-bold text-[#1e3a5f] mb-2">Complete Payment</h2>
       <p className="text-gray-500 mb-8">
-        Scan the QR code or use the UPI ID to complete payment
+        You will be redirected to the BharatPe secure payment page.
       </p>
 
-      <div className="flex flex-col items-center mb-8">
-        <div className="bg-white p-4 rounded-2xl shadow-lg border border-gray-100 mb-6">
-          {qrDataUrl && (
-            <img
-              src={qrDataUrl}
-              alt="UPI QR Code"
-              className="w-64 h-64"
-            />
-          )}
-        </div>
-
-        <div className="glass-card p-6 w-full max-w-sm text-center">
-          <p className="text-sm text-gray-500 mb-1">Pay to UPI ID</p>
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <span className="text-lg font-bold text-[#1e3a5f] font-mono">
-              {upiId}
-            </span>
-            <button
-              onClick={handleCopy}
-              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-              title="Copy UPI ID"
-            >
-              {copied ? (
-                <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              ) : (
-                <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                </svg>
-              )}
-            </button>
+      {paymentError && (
+        <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-100">
+          <div className="flex items-center gap-3">
+            <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <p className="text-sm text-red-700">{paymentError}</p>
           </div>
-
-          <div className="text-3xl font-bold text-[#1e3a5f] mb-2">
-            ₹{amount.toLocaleString('en-IN')}
-          </div>
-          <p className="text-sm text-gray-400">Total Amount</p>
         </div>
-      </div>
+      )}
 
-      <div className="glass-card p-6 mb-6">
-        <h3 className="font-bold text-gray-900 mb-3">Confirm Payment</h3>
-        <p className="text-sm text-gray-500 mb-3">
-          After paying via UPI, enter the transaction reference (UTR) number from your UPI app below.
+      <div className="glass-card p-8 text-center mb-8">
+        <div className="w-16 h-16 rounded-2xl bg-[#1e3a5f]/5 flex items-center justify-center mx-auto mb-4">
+          <svg className="w-8 h-8 text-[#1e3a5f]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+          </svg>
+        </div>
+        <div className="text-3xl font-bold text-[#1e3a5f] mb-2">
+          ₹{amount.toLocaleString('en-IN')}
+        </div>
+        <p className="text-gray-500">Total Amount</p>
+        <p className="text-sm text-gray-400 mt-4">
+          Booking Ref: <span className="font-mono font-medium text-gray-600">{bookingRef}</span>
         </p>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            UPI Transaction Reference (UTR)
-          </label>
-          <input
-            type="text"
-            value={utr}
-            onChange={(e) => { setUtr(e.target.value); setUtrError(''); }}
-            className={`input-field ${utrError ? 'border-red-400' : ''}`}
-            placeholder="e.g. 123456789012"
-          />
-          {utrError && <p className="text-xs text-red-500 mt-1">{utrError}</p>}
-        </div>
       </div>
 
       <div className="space-y-3">
-        <a
-          href={upiDeepLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn-primary w-full justify-center text-lg"
-        >
-          <svg className="w-5 h-5" viewBox="0 0 32 32" fill="none">
-            <rect width="32" height="32" rx="6" fill="white" />
-            <path d="M10 16l4-6 4 6-4 6-4-6z" fill="#1e3a5f" />
-            <path d="M18 16l4-6 4 6-4 6-4-6z" fill="#2e86c1" />
-          </svg>
-          Pay with UPI App
-        </a>
-
         <button
-          onClick={handleConfirm}
+          onClick={onRetry}
           disabled={processing}
-          className="w-full py-3.5 rounded-xl font-semibold text-white transition-all bg-green-600 hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2"
+          className="btn-primary w-full justify-center text-lg"
         >
           {processing ? (
             <>
@@ -703,14 +604,14 @@ function StepUPIPayment({
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              Verifying Payment...
+              Redirecting to BharatPe...
             </>
           ) : (
             <>
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
-              I&apos;ve Paid &mdash; Confirm Booking
+              Pay with BharatPe
             </>
           )}
         </button>
@@ -722,13 +623,19 @@ function StepUPIPayment({
         >
           Back
         </button>
+
+        <p className="text-xs text-gray-400 text-center">
+          Secure payment powered by <span className="font-semibold">BharatPe</span>.
+          We support UPI, Credit/Debit Cards, and Net Banking.
+        </p>
       </div>
     </div>
   );
 }
 
-export default function BookPage() {
+function BookPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState(0);
   const [selectedDateId, setSelectedDateId] = useState<number | null>(null);
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
@@ -741,7 +648,8 @@ export default function BookPage() {
   const [examCenter, setExamCenter] = useState('');
   const [processing, setProcessing] = useState(false);
   const [bookingId, setBookingId] = useState<string | null>(null);
-  const [settings, setSettings] = useState<{ upi_id: string; upi_name: string; price_per_ticket: string } | null>(null);
+  const [paymentError, setPaymentError] = useState('');
+  const [settings, setSettings] = useState<{ price_per_ticket: string } | null>(null);
   const [settingsError, setSettingsError] = useState('');
 
   useEffect(() => {
@@ -754,9 +662,23 @@ export default function BookPage() {
       .catch(() => setSettingsError('Failed to load. Check database connection.'));
   }, []);
 
+  useEffect(() => {
+    const error = searchParams.get('error');
+    const bid = searchParams.get('id');
+    if (error && bid) {
+      setBookingId(bid);
+      setStep(5);
+      if (error === 'payment_failed') {
+        setPaymentError('Payment was not completed. Please try again.');
+      } else if (error === 'server_error') {
+        setPaymentError('A server error occurred. Please try again.');
+      } else {
+        setPaymentError('Payment could not be processed. Please try again.');
+      }
+    }
+  }, [searchParams]);
+
   const pricePerTicket = settings ? Number(settings.price_per_ticket) || 500 : 500;
-  const upiId = settings?.upi_id || '9848579053@paytm';
-  const upiName = settings?.upi_name || 'Suman Travels';
 
   const steps = ['Slot', 'Tickets', 'Center', 'Details', 'Summary', 'Payment'];
 
@@ -838,27 +760,29 @@ export default function BookPage() {
     }
   };
 
-  const handlePaymentComplete = async (utr: string) => {
+  const handleBharatPePayment = async () => {
     if (!bookingId) return;
     setProcessing(true);
+    setPaymentError('');
 
     try {
-      const payRes = await fetch('/api/payment', {
+      const res = await fetch('/api/bharatpe/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ booking_id: bookingId, utr_number: utr }),
+        body: JSON.stringify({ booking_id: bookingId }),
       });
 
-      if (!payRes.ok) {
-        const err = await payRes.json();
-        alert(err.error || 'Payment failed');
+      const data = await res.json();
+
+      if (!res.ok || !data.payment_url) {
+        setPaymentError(data.error || 'Could not initiate payment. Please try again.');
         setProcessing(false);
         return;
       }
 
-      router.push(`/success?id=${bookingId}`);
+      window.location.href = data.payment_url;
     } catch {
-      alert('Payment verification failed. Please try again.');
+      setPaymentError('Could not connect to payment gateway. Please try again.');
       setProcessing(false);
     }
   };
@@ -1003,18 +927,31 @@ export default function BookPage() {
           )}
 
           {step === 5 && bookingId && (
-            <StepUPIPayment
+            <StepBharatPePayment
               amount={passengers.length * pricePerTicket}
               bookingRef={bookingId}
-              upiId={upiId}
-              upiName={upiName}
               onBack={() => setStep(4)}
-              onPaymentComplete={handlePaymentComplete}
+              onRetry={handleBharatPePayment}
+              paymentError={paymentError}
               processing={processing}
             />
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+export default function BookPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 py-10">
+        <div className="flex items-center justify-center py-20">
+          <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
+        </div>
+      </div>
+    }>
+      <BookPageInner />
+    </Suspense>
   );
 }
