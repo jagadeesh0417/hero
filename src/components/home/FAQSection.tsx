@@ -21,7 +21,7 @@ const faqs = [
   },
   {
     q: 'Can I cancel my booking?',
-    a: 'Please contact us directly at +91 9848579053 for cancellation requests and refund policies.',
+    a: 'Please contact us directly at +91 9010532226 or +91 8639511463 for cancellation requests and refund policies.',
   },
   {
     q: 'Is there a limit on passenger count?',

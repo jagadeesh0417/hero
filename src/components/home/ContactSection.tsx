@@ -21,7 +21,8 @@ export default function ContactSection() {
     return () => observer.disconnect();
   }, []);
 
-  const phone = '+919848579053';
+  const primaryPhone = '+919010532226';
+  const secondaryPhone = '+918639511463';
 
   return (
     <section ref={ref} className="py-20 bg-gray-50 opacity-0" id="contact">
@@ -51,10 +52,16 @@ export default function ContactSection() {
                 <div>
                   <p className="font-semibold text-gray-900">Phone</p>
                   <a
-                    href={`tel:${phone}`}
-                    className="text-[#2e86c1] hover:underline"
+                    href={`tel:${primaryPhone}`}
+                    className="text-[#2e86c1] hover:underline block"
                   >
-                    +91 9848579053
+                    +91 9010532226
+                  </a>
+                  <a
+                    href={`tel:${secondaryPhone}`}
+                    className="text-[#2e86c1] hover:underline block"
+                  >
+                    +91 8639511463
                   </a>
                 </div>
               </div>
@@ -79,7 +86,7 @@ export default function ContactSection() {
 
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <a
-                href={`tel:${phone}`}
+                href={`tel:${primaryPhone}`}
                 className="btn-primary flex-1 justify-center"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -88,7 +95,7 @@ export default function ContactSection() {
                 Call
               </a>
               <a
-                href={`https://wa.me/${phone}`}
+                href={`https://wa.me/${primaryPhone}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-accent flex-1 justify-center"

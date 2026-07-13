@@ -19,6 +19,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Close sidebar on mobile after navigation
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [pathname]);
+
   useEffect(() => {
     fetch('/api/auth/me')
       .then((r) => {
@@ -35,9 +40,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, [router, pathname]);
 
   const handleLogout = async () => {
+    setSidebarOpen(false);
     await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/admin');
   };
+
+  const closeSidebar = () => setSidebarOpen(false);
 
   if (pathname === '/admin') return <>{children}</>;
 
@@ -53,13 +61,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
+      {/* Backdrop overlay for mobile sidebar */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/30 lg:hidden"
+          onClick={closeSidebar}
+        />
+      )}
+
       <aside
         className={`fixed inset-y-0 left-0 z-40 w-64 bg-[#1e3a5f] text-white transform transition-transform duration-300 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } lg:translate-x-0 lg:static lg:inset-auto`}
       >
         <div className="p-6">
-          <Link href="/admin/dashboard" className="flex items-center gap-2 text-xl font-bold">
+          <Link href="/admin/dashboard" onClick={closeSidebar} className="flex items-center gap-2 text-xl font-bold">
             <svg className="w-7 h-7" viewBox="0 0 32 32" fill="none">
               <rect width="32" height="32" rx="8" fill="white" />
               <path d="M16 6L6 12v4l10-6 10 6v-4L16 6z" fill="#1e3a5f" />
@@ -76,6 +92,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={closeSidebar}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
                   active
                     ? 'bg-white/10 text-white'
@@ -94,6 +111,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10">
           <Link
             href="/"
+            onClick={closeSidebar}
             className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white transition-all"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

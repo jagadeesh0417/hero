@@ -61,7 +61,8 @@ async function getBookingsForDate(dateStr: string) {
     `SELECT b.booking_id, b.exam_center, b.passenger_count, b.amount,
             b.payment_status, b.created_at, d.date, s.time,
             (SELECT p.name FROM passengers p WHERE p.booking_id = b.booking_id ORDER BY p.id LIMIT 1) as name,
-            (SELECT p.mobile FROM passengers p WHERE p.booking_id = b.booking_id ORDER BY p.id LIMIT 1) as mobile
+            (SELECT p.mobile FROM passengers p WHERE p.booking_id = b.booking_id ORDER BY p.id LIMIT 1) as mobile,
+            (SELECT p.gender FROM passengers p WHERE p.booking_id = b.booking_id ORDER BY p.id LIMIT 1) as gender
      FROM bookings b
      JOIN dates d ON b.date_id = d.id
      JOIN slots s ON b.slot_id = s.id

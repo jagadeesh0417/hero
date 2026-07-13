@@ -367,7 +367,7 @@ async function ensureSchema(): Promise<void> {
     upi_name: 'Suman Travels',
     price_per_ticket: '500',
     business_name: 'Suman Travels',
-    business_phone: '+91 9848579053',
+    business_phone: '+91 9010532226',
     business_address: 'Lalitha Nagar, NGO Colony, Nandyala, Andhra Pradesh – 518502',
   };
 

@@ -20,7 +20,7 @@ import path from 'path';
 import { to12h } from './slots';
 
 const BUSINESS_NAME = 'SUMAN TRAVELS';
-const PHONE = '+91 9848579053';
+const PHONE = '+91 9010532226';
 const ADDRESS_LINE1 = 'Lalitha Nagar, NGO Colony';
 const ADDRESS_LINE2 = 'Nandyala, Andhra Pradesh – 518502';
 

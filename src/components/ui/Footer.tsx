@@ -29,10 +29,18 @@ export default function Footer() {
             <ul className="space-y-2 text-sm text-gray-300">
               <li>
                 <a
-                  href="tel:+919848579053"
+                  href="tel:+919010532226"
                   className="hover:text-white transition-colors"
                 >
-                  +91 9848579053
+                  +91 9010532226
+                </a>
+              </li>
+              <li>
+                <a
+                  href="tel:+918639511463"
+                  className="hover:text-white transition-colors"
+                >
+                  +91 8639511463
                 </a>
               </li>
               <li>Lalitha Nagar, NGO Colony</li>

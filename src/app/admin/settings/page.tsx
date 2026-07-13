@@ -127,7 +127,7 @@ export default function AdminSettings() {
               value={settings.business_phone}
               onChange={(e) => setSettings({ ...settings, business_phone: e.target.value })}
               className="input-field"
-              placeholder="+91 9848579053"
+              placeholder="+91 9010532226"
             />
           </div>
         </div>
