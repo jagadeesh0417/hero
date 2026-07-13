@@ -12,6 +12,7 @@
     "@libsql/client": "^0.17.4",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.11.1",
+    "date-fns": "^4.4.0",
     "docx": "^9.7.1",
     "exceljs": "^4.4.0",
     "jsonwebtoken": "^9.0.3",
@@ -19,6 +20,7 @@
     "qrcode": "^1.5.4",
     "razorpay": "^2.9.6",
     "react": "19.2.4",
+    "react-day-picker": "^10.0.1",
     "react-dom": "19.2.4",
     "uuid": "^14.0.0"
   },

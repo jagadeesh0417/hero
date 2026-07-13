@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { DayPicker } from 'react-day-picker';
+import 'react-day-picker/style.css';
+import { format } from 'date-fns';
 import { slotLabel, to12h, EXAM_CENTERS } from '@/lib/slots';
 
 interface DateOption {
@@ -68,40 +71,19 @@ function CalendarWidget({
 }) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const [viewMonth, setViewMonth] = useState(today.getMonth());
-  const [viewYear, setViewYear] = useState(today.getFullYear());
 
-  const availableMap = new Map(
-    availableDates.map((d) => {
-      const dateObj = new Date(d.date);
-      const key = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
-      return [key, d.id];
-    })
-  );
+  const availableDatesSet = new Set(availableDates.map((d) => d.date));
 
   const selectedDate = availableDates.find((d) => d.id === selectedDateId);
   const selectedDateObj = selectedDate ? new Date(selectedDate.date) : null;
 
-  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-  const startDay = new Date(viewYear, viewMonth, 1).getDay();
-
-  const prevMonth = () => {
-    if (viewMonth === 0) { setViewMonth(11); setViewYear(viewYear - 1); }
-    else { setViewMonth(viewMonth - 1); }
-  };
-
-  const nextMonth = () => {
-    if (viewMonth === 11) { setViewMonth(0); setViewYear(viewYear + 1); }
-    else { setViewMonth(viewMonth + 1); }
-  };
-
-  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'];
-
-  const isPastDate = (day: number) => {
-    const d = new Date(viewYear, viewMonth, day);
-    return d < today;
-  };
+  const disabledDays = [
+    { before: today },
+    (day: Date) => {
+      const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+      return !availableDatesSet.has(key);
+    },
+  ];
 
   return (
     <div>
@@ -111,72 +93,27 @@ function CalendarWidget({
       {selectedDateObj && (
         <div className="mb-4 px-4 py-3 bg-[#1e3a5f]/5 rounded-xl border border-[#1e3a5f]/10">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500">Selected Date</span>
+            <span className="text-sm text-gray-500">Selected</span>
             <span className="font-bold text-[#1e3a5f]">
-              {`${String(selectedDateObj.getDate()).padStart(2, '0')}/${String(selectedDateObj.getMonth() + 1).padStart(2, '0')}/${selectedDateObj.getFullYear()}`}
+              {format(selectedDateObj, 'dd MMMM yyyy')}
             </span>
           </div>
         </div>
       )}
-      <div className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <button
-            onClick={prevMonth}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <span className="font-bold text-gray-900 text-base">
-            {monthNames[viewMonth]} {viewYear}
-          </span>
-          <button
-            onClick={nextMonth}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="grid grid-cols-7 gap-1 mb-2">
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-            <div key={d} className="text-center text-xs font-semibold text-gray-400 py-2">
-              {d}
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-7 gap-1">
-          {Array.from({ length: startDay }).map((_, i) => (
-            <div key={`empty-${i}`} />
-          ))}
-          {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
-            const dateKey = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-            const dateId = availableMap.get(dateKey);
-            const isSelected = selectedDateId !== null && selectedDateId === dateId;
-            const disabled = isPastDate(day) || !dateId;
-
-            return (
-              <button
-                key={day}
-                disabled={disabled}
-                onClick={() => dateId && onSelect(dateId)}
-                className={`text-center py-2 rounded-lg text-sm font-medium transition-all ${
-                  isSelected
-                    ? 'bg-[#1e3a5f] text-white shadow-md'
-                    : disabled
-                      ? 'text-gray-300 cursor-not-allowed'
-                      : 'text-gray-700 hover:bg-[#1e3a5f]/5 hover:text-[#1e3a5f] cursor-pointer'
-                }`}
-              >
-                {day}
-              </button>
-            );
-          })}
-        </div>
+      <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+        <DayPicker
+          mode="single"
+          selected={selectedDateObj || undefined}
+          onSelect={(day: Date | undefined) => {
+            if (!day) return;
+            const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+            const dateOption = availableDates.find((d) => d.date === key);
+            if (dateOption) onSelect(dateOption.id);
+          }}
+          disabled={disabledDays}
+          showOutsideDays={false}
+          required
+        />
       </div>
     </div>
   );
@@ -237,21 +174,11 @@ function StepSelectSlot({
       </h2>
 
       <div className="mb-8">
-        {dates.length === 0 ? (
-          <div className="text-center py-12 bg-gray-50 rounded-xl">
-            <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <p className="text-gray-500 font-medium">No dates available yet</p>
-            <p className="text-gray-400 text-sm mt-1">Please check back later</p>
-          </div>
-        ) : (
-          <CalendarWidget
-            availableDates={dates}
-            selectedDateId={selectedDateId}
-            onSelect={handleDateSelect}
-          />
-        )}
+        <CalendarWidget
+          availableDates={dates}
+          selectedDateId={selectedDateId}
+          onSelect={handleDateSelect}
+        />
       </div>
 
       {selectedDateId && (
