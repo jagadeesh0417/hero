@@ -33,3 +33,19 @@ export function verifyPaymentSignature(orderId: string, paymentId: string, signa
     .digest('hex');
   return expectedSig === signature;
 }
+
+export interface RazorpayPaymentDetails {
+  status: string;
+  method: string;
+  bank_transaction_id: string | null;
+}
+
+export async function fetchPayment(paymentId: string): Promise<RazorpayPaymentDetails> {
+  const rzp = getRazorpay();
+  const payment = await rzp.payments.fetch(paymentId);
+  return {
+    status: payment.status || '',
+    method: payment.method || '',
+    bank_transaction_id: payment.acquirer_data?.bank_transaction_id || null,
+  };
+}

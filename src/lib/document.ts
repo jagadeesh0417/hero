@@ -33,12 +33,18 @@ interface PassengerDoc {
 interface BookingDocData {
   bookingId: string;
   paymentStatus: string;
+  serialNumber?: number;
   date: string;
   time: string;
   vehicleTime?: string;
   examCenter?: string;
   passengerCount: number;
   amount: number;
+  razorpayPaymentId?: string;
+  razorpayStatus?: string;
+  razorpayMethod?: string;
+  razorpayBankRef?: string;
+  paymentTimestamp?: string;
   passengers: PassengerDoc[];
 }
 
@@ -220,6 +226,15 @@ export async function generateBookingDocument(
             ],
             spacing: { after: 60 },
           }),
+          ...(data.serialNumber
+            ? [new Paragraph({
+                children: [
+                  new TextRun({ text: `Serial No: `, bold: true, size: 20 }),
+                  new TextRun({ text: `${data.serialNumber}`, size: 20, color: '1E3A5F' }),
+                ],
+                spacing: { after: 60 },
+              })]
+            : []),
           new Paragraph({
             children: [
               new TextRun({ text: `Payment Status: `, bold: true, size: 20 }),
@@ -231,6 +246,51 @@ export async function generateBookingDocument(
             ],
             spacing: { after: 60 },
           }),
+          ...(data.razorpayPaymentId
+            ? [new Paragraph({
+                children: [
+                  new TextRun({ text: `Razorpay Payment ID: `, bold: true, size: 20 }),
+                  new TextRun({ text: `${data.razorpayPaymentId}`, size: 20 }),
+                ],
+                spacing: { after: 60 },
+              })]
+            : []),
+          ...(data.razorpayStatus
+            ? [new Paragraph({
+                children: [
+                  new TextRun({ text: `Payment Status: `, bold: true, size: 20 }),
+                  new TextRun({ text: `${data.razorpayStatus}`, size: 20 }),
+                ],
+                spacing: { after: 60 },
+              })]
+            : []),
+          ...(data.razorpayMethod
+            ? [new Paragraph({
+                children: [
+                  new TextRun({ text: `Payment Method: `, bold: true, size: 20 }),
+                  new TextRun({ text: `${data.razorpayMethod}`, size: 20 }),
+                ],
+                spacing: { after: 60 },
+              })]
+            : []),
+          ...(data.razorpayBankRef
+            ? [new Paragraph({
+                children: [
+                  new TextRun({ text: `Bank Ref / UTR: `, bold: true, size: 20 }),
+                  new TextRun({ text: `${data.razorpayBankRef}`, size: 20 }),
+                ],
+                spacing: { after: 60 },
+              })]
+            : []),
+          ...(data.paymentTimestamp
+            ? [new Paragraph({
+                children: [
+                  new TextRun({ text: `Payment Time: `, bold: true, size: 20 }),
+                  new TextRun({ text: `${data.paymentTimestamp}`, size: 20 }),
+                ],
+                spacing: { after: 60 },
+              })]
+            : []),
           new Paragraph({
             children: [
               new TextRun({ text: `Booking Date: `, bold: true, size: 20 }),

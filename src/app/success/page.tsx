@@ -8,6 +8,7 @@ interface BookingData {
   booking_id: string;
   payment_status: string;
   payment_id: string;
+  serial_number?: number;
   date: string;
   time: string;
   vehicle_time?: string;
@@ -125,6 +126,14 @@ export default function SuccessPage({
                 {booking.booking_id}
               </span>
             </div>
+            {booking.serial_number && (
+              <div className="flex justify-between items-center py-2 border-b border-gray-50">
+                <span className="text-gray-500">Serial No.</span>
+                <span className="font-bold text-[#1e3a5f]">
+                  {booking.serial_number}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between items-center py-2 border-b border-gray-50">
               <span className="text-gray-500">Payment Status</span>
               <span className="px-3 py-1 bg-green-50 text-green-600 rounded-full text-sm font-semibold">

@@ -20,8 +20,12 @@ interface BookingDetail {
   payment_status: string;
   payment_id: string;
   utr_number: string;
+  serial_number?: number;
   razorpay_order_id?: string;
   razorpay_payment_id?: string;
+  razorpay_status?: string;
+  razorpay_method?: string;
+  razorpay_bank_ref?: string;
   payment_timestamp?: string;
   customer_name?: string;
   customer_mobile?: string;
@@ -82,6 +86,12 @@ export default function BookingDetailPage({
               <span className="text-gray-500">Booking ID</span>
               <span className="font-mono font-bold text-[#1e3a5f]">{booking.booking_id}</span>
             </div>
+            {booking.serial_number && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Serial No.</span>
+                <span className="font-bold text-[#1e3a5f]">{booking.serial_number}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-gray-500">Status</span>
               <span
@@ -163,6 +173,24 @@ export default function BookingDetailPage({
               <div className="flex justify-between">
                 <span className="text-gray-500">Razorpay Payment ID</span>
                 <span className="font-mono text-sm text-gray-600">{booking.razorpay_payment_id}</span>
+              </div>
+            )}
+            {booking.razorpay_status && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Payment Status</span>
+                <span className="text-sm text-gray-600">{booking.razorpay_status}</span>
+              </div>
+            )}
+            {booking.razorpay_method && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Payment Method</span>
+                <span className="text-sm text-gray-600 capitalize">{booking.razorpay_method}</span>
+              </div>
+            )}
+            {booking.razorpay_bank_ref && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Bank Ref / UTR</span>
+                <span className="font-mono text-sm text-gray-600">{booking.razorpay_bank_ref}</span>
               </div>
             )}
             {booking.payment_timestamp && (

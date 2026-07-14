@@ -361,6 +361,22 @@ async function ensureSchema(): Promise<void> {
     await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN customer_email TEXT DEFAULT ''" });
   } catch {
   }
+  try {
+    await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN serial_number INTEGER DEFAULT NULL" });
+  } catch {
+  }
+  try {
+    await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN razorpay_status TEXT DEFAULT ''" });
+  } catch {
+  }
+  try {
+    await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN razorpay_method TEXT DEFAULT ''" });
+  } catch {
+  }
+  try {
+    await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN razorpay_bank_ref TEXT DEFAULT ''" });
+  } catch {
+  }
 
   const defaultSettings: Record<string, string> = {
     upi_id: '9848579053@paytm',
