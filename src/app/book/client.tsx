@@ -841,7 +841,8 @@ export default function BookPageClient() {
       setBookingId(booking.booking_id);
       setStep(5);
       setProcessing(false);
-    } catch {
+    } catch (err) {
+      console.error('[Booking] handleCreateBooking error:', err);
       alert('Something went wrong. Please try again.');
       setProcessing(false);
     }
@@ -870,7 +871,8 @@ export default function BookPageClient() {
       } else {
         setPaymentError(data.error || 'Payment not found. Please try paying again.');
       }
-    } catch {
+    } catch (err) {
+      console.error('[Booking] handleCheckPaymentStatus error:', err);
       setPaymentError('Could not check payment status. Please try again.');
     } finally {
       setCheckingStatus(false);
@@ -940,8 +942,8 @@ export default function BookPageClient() {
               setPaymentError(statusData.error || 'Payment failed. Please try again.');
               setProcessing(false);
             }
-          } catch {
-            // Network error — retry on next interval
+          } catch (pollErr) {
+            console.error('[Payment] Status polling error:', pollErr);
           }
         }, 3000);
       };
@@ -986,7 +988,7 @@ export default function BookPageClient() {
           ondismiss: function () {
             stopPolling();
             if (!paymentCompleted) {
-              setPaymentError('Payment cancelled. Please try again.');
+              setPaymentError('Payment window closed. If money was deducted from your account, click "Already Paid? Check Status" to confirm your booking, or contact support.');
               setProcessing(false);
             }
           },
@@ -1005,7 +1007,8 @@ export default function BookPageClient() {
 
       // Start polling fallback after modal opens
       startPolling();
-    } catch {
+    } catch (err) {
+      console.error('[Booking] handleRazorpayPayment error:', err);
       setPaymentError('Could not connect to payment gateway. Please try again.');
       setProcessing(false);
     }

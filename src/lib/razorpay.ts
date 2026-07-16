@@ -2,15 +2,32 @@ import Razorpay from 'razorpay';
 import crypto from 'crypto';
 
 let razorpayInstance: Razorpay | null = null;
+let envAsserted = false;
+
+export function assertRazorpayEnv(): void {
+  if (envAsserted) return;
+  const missing: string[] = [];
+  if (!process.env.RAZORPAY_KEY_ID) missing.push('RAZORPAY_KEY_ID');
+  if (!process.env.RAZORPAY_KEY_SECRET) missing.push('RAZORPAY_KEY_SECRET');
+  if (!process.env.RAZORPAY_WEBHOOK_SECRET) missing.push('RAZORPAY_WEBHOOK_SECRET');
+  if (missing.length > 0) {
+    throw new Error(`Missing required Razorpay env vars: ${missing.join(', ')}`);
+  }
+  const keyId = process.env.RAZORPAY_KEY_ID || '';
+  const keySecret = process.env.RAZORPAY_KEY_SECRET || '';
+  const modeLive = keyId.startsWith('rzp_live_');
+  const secretLive = keySecret.startsWith('rzp_live_');
+  if (modeLive !== secretLive) {
+    throw new Error(`Razorpay key mode mismatch: KEY_ID=${keyId.startsWith('rzp_live_') ? 'LIVE' : 'TEST'}, KEY_SECRET=${keySecret.startsWith('rzp_live_') ? 'LIVE' : 'TEST'}. Both must be the same mode.`);
+  }
+  console.log(`[Razorpay] ${modeLive ? 'LIVE' : 'TEST'} mode, key_id=${keyId.slice(0, 12)}...`);
+  envAsserted = true;
+}
 
 function getRazorpay(): Razorpay {
   if (!razorpayInstance) {
-    const keyId = process.env.RAZORPAY_KEY_ID;
-    const keySecret = process.env.RAZORPAY_KEY_SECRET;
-    if (!keyId || !keySecret) {
-      throw new Error('Razorpay credentials not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET env vars.');
-    }
-    razorpayInstance = new Razorpay({ key_id: keyId, key_secret: keySecret });
+    assertRazorpayEnv();
+    razorpayInstance = new Razorpay({ key_id: process.env.RAZORPAY_KEY_ID!, key_secret: process.env.RAZORPAY_KEY_SECRET! });
   }
   return razorpayInstance;
 }
@@ -31,7 +48,15 @@ export function verifyPaymentSignature(orderId: string, paymentId: string, signa
     .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '')
     .update(`${orderId}|${paymentId}`)
     .digest('hex');
-  return expectedSig === signature;
+  if (expectedSig.length !== signature.length) {
+    console.error(`[verifyPaymentSignature] Length mismatch for order ${orderId}: expected ${expectedSig.length}, got ${signature.length}`);
+    return false;
+  }
+  const valid = crypto.timingSafeEqual(Buffer.from(expectedSig, 'utf-8'), Buffer.from(signature, 'utf-8'));
+  if (!valid) {
+    console.error(`[verifyPaymentSignature] Signature mismatch for order ${orderId}, payment ${paymentId}`);
+  }
+  return valid;
 }
 
 export interface RazorpayPaymentDetails {
@@ -122,6 +147,18 @@ export async function confirmBooking(
   const { appendBookingToSheet } = await import('@/lib/google-sheets');
 
   console.log(`[confirmBooking] Confirming booking ${booking_id}, order=${razorpay_order_id}, payment=${razorpay_payment_id}`);
+
+  // Log payment event
+  try {
+    const { dbExecute } = await import('@/lib/db');
+    await dbExecute(
+      `INSERT INTO payment_events (razorpay_order_id, razorpay_payment_id, event, status, amount, signature_valid, booking_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      [razorpay_order_id, razorpay_payment_id, 'confirm_booking_started', 'processing', 0, 1, booking_id]
+    );
+  } catch (e: any) {
+    console.error('[confirmBooking] logPaymentEvent error:', e?.message || e);
+  }
 
   // Fetch and validate payment details from Razorpay
   let paymentDetails: RazorpayPaymentDetails;
@@ -215,6 +252,18 @@ export async function confirmBooking(
 
     console.log(`[confirmBooking] Booking ${booking_id} confirmed with serial ${serialNumber}`);
 
+    // Log successful confirmation event
+    try {
+      const { dbExecute } = await import('@/lib/db');
+      await dbExecute(
+        `INSERT INTO payment_events (razorpay_order_id, razorpay_payment_id, event, status, amount, signature_valid, booking_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+        [razorpay_order_id, razorpay_payment_id, 'booking_confirmed', 'confirmed', Number(booking.amount) || 0, 1, booking_id]
+      );
+    } catch (e: any) {
+      console.error('[confirmBooking] logPaymentEvent error:', e?.message || e);
+    }
+
     // Fire-and-forget Google Sheets append
     (async () => {
       try {
@@ -251,8 +300,8 @@ export async function confirmBooking(
             booking_time: new Date().toISOString(),
           });
         }
-      } catch {
-        // Google Sheets failure is non-critical
+      } catch (gsErr: any) {
+        console.error('[confirmBooking] Google Sheets error:', gsErr?.message || gsErr);
       }
     })();
 
@@ -262,11 +311,12 @@ export async function confirmBooking(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ booking_id, serial_number: serialNumber }),
-    }).catch(() => {});
+    }).catch((reErr: any) => console.error('[confirmBooking] Revalidation error:', reErr?.message || reErr));
 
     return { success: true, serial_number: serialNumber };
-  } catch (e) {
-    try { await tx.rollback(); } catch {}
+  } catch (e: any) {
+    console.error('[confirmBooking] Transaction error:', e?.name, e?.message, e?.stack);
+    try { await tx.rollback(); } catch (re: any) { console.error('[confirmBooking] Rollback error:', re?.message || re); }
     throw e;
   }
 }

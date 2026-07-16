@@ -310,6 +310,20 @@ async function ensureSchema(): Promise<void> {
       value TEXT NOT NULL,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`,
+    `CREATE TABLE IF NOT EXISTS payment_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      razorpay_order_id TEXT NOT NULL DEFAULT '',
+      razorpay_payment_id TEXT NOT NULL DEFAULT '',
+      event TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT '',
+      amount INTEGER NOT NULL DEFAULT 0,
+      signature_valid INTEGER NOT NULL DEFAULT 0,
+      booking_id TEXT NOT NULL DEFAULT '',
+      raw_payload TEXT NOT NULL DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+    'CREATE INDEX IF NOT EXISTS idx_payment_events_order ON payment_events(razorpay_order_id)',
+    'CREATE INDEX IF NOT EXISTS idx_payment_events_booking ON payment_events(booking_id)',
     'CREATE UNIQUE INDEX IF NOT EXISTS idx_slots_date_id_time ON slots(date_id, time)',
     'CREATE INDEX IF NOT EXISTS idx_slots_date_id ON slots(date_id)',
     'CREATE INDEX IF NOT EXISTS idx_bookings_booking_id ON bookings(booking_id)',

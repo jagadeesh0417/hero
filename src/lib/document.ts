@@ -15,8 +15,6 @@ import {
   HeadingLevel,
   TableLayoutType,
 } from 'docx';
-import fs from 'fs';
-import path from 'path';
 import { to12h } from './slots';
 
 const BUSINESS_NAME = 'SUMAN TRAVELS';
@@ -87,8 +85,7 @@ function createDataRow(values: string[]): TableRow {
 }
 
 export async function generateBookingDocument(
-  data: BookingDocData,
-  outputPath?: string
+  data: BookingDocData
 ): Promise<Buffer> {
   const doc = new Document({
     styles: {
@@ -427,30 +424,5 @@ export async function generateBookingDocument(
     ],
   });
 
-  const buffer = Buffer.from(await Packer.toBuffer(doc));
-
-  if (outputPath) {
-    const dir = path.dirname(outputPath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(outputPath, buffer);
-  }
-
-  return buffer;
-}
-
-export function getDocumentDir(): string {
-  const isVercel = process.env.VERCEL === '1';
-  const dir = isVercel
-    ? path.join('/tmp', 'documents')
-    : path.join(process.cwd(), 'data', 'documents');
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  return dir;
-}
-
-export function getDocumentPath(bookingId: string): string {
-  return path.join(getDocumentDir(), `${bookingId}.docx`);
+  return Buffer.from(await Packer.toBuffer(doc));
 }

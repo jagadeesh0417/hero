@@ -3,9 +3,13 @@ import { dbExecute, rowsToObjects, getDb } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth';
 import { generateBookingId } from '@/lib/utils';
 
+export const dynamic = 'force-dynamic';
+
+const noStoreHeaders = { 'Cache-Control': 'no-store, max-age=0, must-revalidate' };
+
 export async function GET(request: NextRequest) {
   const email = await getAdminSession();
-  if (!email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: noStoreHeaders });
 
   try {
     const { searchParams } = new URL(request.url);
@@ -50,7 +54,7 @@ export async function GET(request: NextRequest) {
     query += ' ORDER BY b.created_at DESC';
 
     const result = await dbExecute(query, params);
-    return NextResponse.json(rowsToObjects(result));
+    return NextResponse.json(rowsToObjects(result), { headers: noStoreHeaders });
   } catch (err: any) {
     console.error('[API /bookings] GET error:', err?.message || err);
     return NextResponse.json({ error: 'Failed to fetch bookings' }, { status: 500 });

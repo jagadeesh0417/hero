@@ -22,8 +22,8 @@ export default function AdminDocuments() {
         const data = await res.json();
         setFiles(data);
       }
-    } catch {
-      // silent
+    } catch (err) {
+      console.error('[Documents] loadFiles error:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -60,7 +60,8 @@ export default function AdminDocuments() {
       a.download = `${dd}-${mm}-${yyyy}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
+    } catch (err) {
+      console.error('[Documents] handleDownload error:', err);
       alert('Failed to download. No confirmed bookings for this date.');
     }
   };
