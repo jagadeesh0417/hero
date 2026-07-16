@@ -15,13 +15,10 @@ export function assertRazorpayEnv(): void {
     throw new Error(`Missing required Razorpay env vars: ${missing.join(', ')}`);
   }
   const keyId = process.env.RAZORPAY_KEY_ID || '';
-  const keySecret = process.env.RAZORPAY_KEY_SECRET || '';
-  const modeLive = keyId.startsWith('rzp_live_');
-  const secretLive = keySecret.startsWith('rzp_live_');
-  if (modeLive !== secretLive) {
-    throw new Error(`Razorpay key mode mismatch: KEY_ID=${keyId.startsWith('rzp_live_') ? 'LIVE' : 'TEST'}, KEY_SECRET=${keySecret.startsWith('rzp_live_') ? 'LIVE' : 'TEST'}. Both must be the same mode.`);
-  }
-  console.log(`[Razorpay] ${modeLive ? 'LIVE' : 'TEST'} mode, key_id=${keyId.slice(0, 12)}...`);
+  // Razorpay key secrets are opaque strings with no test/live prefix.
+  // Only KEY_ID signals the mode. No cross-comparison needed.
+  const mode = keyId.startsWith('rzp_live_') ? 'LIVE' : 'TEST';
+  console.log(`[Razorpay] ${mode} mode, key_id=${keyId.slice(0, 12)}...`);
   envAsserted = true;
 }
 
