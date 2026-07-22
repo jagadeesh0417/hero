@@ -3,7 +3,7 @@ export const EXAM_CENTERS = [
   'Brindavan Institute of Technology & Science',
   'K. V. Subba Reddy Institute of Technology',
   'Poojya Educational Society',
-  'RGM College (Rajeev Gandhi Memorial College of Engineering & Technology)',
+  'Unidid Technology, Sanath Nagar, Kurnool',
 ];
 
 export const EXAM_TIMINGS = [

@@ -328,7 +328,6 @@ async function ensureSchema(): Promise<void> {
     'CREATE INDEX IF NOT EXISTS idx_slots_date_id ON slots(date_id)',
     'CREATE INDEX IF NOT EXISTS idx_bookings_booking_id ON bookings(booking_id)',
     'CREATE INDEX IF NOT EXISTS idx_passengers_booking_id ON passengers(booking_id)',
-    'CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_serial ON bookings(date_id, slot_id, serial_number)',
   ];
 
   for (const sql of tables) {
@@ -378,6 +377,10 @@ async function ensureSchema(): Promise<void> {
   }
   try {
     await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN serial_number INTEGER DEFAULT NULL" });
+  } catch {
+  }
+  try {
+    await client.execute({ sql: "CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_serial ON bookings(date_id, slot_id, serial_number)" });
   } catch {
   }
   try {
