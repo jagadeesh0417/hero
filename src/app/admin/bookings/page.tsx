@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { slotLabel } from '@/lib/slots';
 import { formatDateOnly, formatShortTimestamp } from '@/lib/dates';
@@ -33,20 +33,27 @@ interface BookingRecord {
 export default function AdminBookings() {
   const [bookings, setBookings] = useState<BookingRecord[]>([]);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
 
-  const loadBookings = () => {
+  // Debounce the search box so a request isn't fired on every keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const loadBookings = useCallback(() => {
     const params = new URLSearchParams();
-    if (search) params.set('search', search);
+    if (debouncedSearch) params.set('search', debouncedSearch);
     if (statusFilter) params.set('status', statusFilter);
     fetch(`/api/bookings?${params.toString()}`)
       .then((r) => r.json())
       .then(setBookings);
-  };
+  }, [debouncedSearch, statusFilter]);
 
-  useEffect(loadBookings, [search, statusFilter]);
+  useEffect(loadBookings, [loadBookings]);
 
   const handleManualConfirm = async (bookingId: string) => {
     setConfirmingId(bookingId);

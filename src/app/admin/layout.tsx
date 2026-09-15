@@ -27,8 +27,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, [pathname]);
 
   useEffect(() => {
+    let cancelled = false;
     fetch('/api/auth/me')
       .then((r) => {
+        if (cancelled) return;
         if (r.ok) setAuthenticated(true);
         else {
           setAuthenticated(false);
@@ -36,10 +38,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         }
       })
       .catch(() => {
+        if (cancelled) return;
         setAuthenticated(false);
         if (pathname !== '/admin') router.push('/admin');
       });
-  }, [router, pathname]);
+    return () => {
+      cancelled = true;
+    };
+    // Run the session check once on mount. Re-running it on every pathname
+    // change caused a redundant /api/auth/me request and a spinner flash on
+    // each admin navigation, plus a risk of unexpected redirects if the
+    // request hiccuped mid-navigation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleLogout = async () => {
     if (logoutRef.current) return;

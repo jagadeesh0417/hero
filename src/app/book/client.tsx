@@ -148,7 +148,7 @@ function CalendarWidget({
 function StepSelectSlot({
   onNext,
 }: {
-  onNext: (dateId: number, slotId: number) => void;
+  onNext: (dateId: number, slotId: number, date: string, time: string, vehicleTime: string) => void;
 }) {
   const [dates, setDates] = useState<DateOption[]>([]);
   const [slots, setSlots] = useState<SlotOption[]>([]);
@@ -268,7 +268,18 @@ function StepSelectSlot({
       )}
 
       <button
-        onClick={() => selectedDateId && selectedSlotId && onNext(selectedDateId, selectedSlotId)}
+        onClick={() => {
+          if (!selectedDateId || !selectedSlotId) return;
+          const dateObj = dates.find((d) => d.id === selectedDateId);
+          const slotObj = slots.find((s) => s.id === selectedSlotId);
+          onNext(
+            selectedDateId,
+            selectedSlotId,
+            dateObj?.date || '',
+            slotObj?.time || '',
+            slotObj?.vehicle_time || ''
+          );
+        }}
         disabled={!selectedDateId || !selectedSlotId || slotsLoading}
         className="btn-primary w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed"
       >
@@ -699,7 +710,7 @@ function StepRazorpayPayment({
   );
 }
 
-export default function BookPageClient() {
+export default function BookPageClient({ initialPrice = 500 }: { initialPrice: number }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [step, setStep] = useState(0);
@@ -717,18 +728,6 @@ export default function BookPageClient() {
   const [paymentError, setPaymentError] = useState('');
   const bookingBusyRef = useRef(false);
   const paymentBusyRef = useRef(false);
-  const [settings, setSettings] = useState<{ price_per_ticket: string } | null>(null);
-  const [settingsError, setSettingsError] = useState('');
-
-  useEffect(() => {
-    fetch('/api/settings')
-      .then((r) => {
-        if (!r.ok) throw new Error('Failed to load settings');
-        return r.json();
-      })
-      .then((data) => setSettings(data as any))
-      .catch(() => setSettingsError('Failed to load. Check database connection.'));
-  }, []);
 
   useEffect(() => {
     const error = searchParams.get('error');
@@ -773,30 +772,21 @@ export default function BookPageClient() {
     }
   }, [bookingId, step, router]);
 
-  const pricePerTicket = settings ? Number(settings.price_per_ticket) || 500 : 500;
+  const pricePerTicket = initialPrice;
 
   const steps = ['Slot', 'Tickets', 'Center', 'Details', 'Summary', 'Payment'];
 
-  const handleSlotNext = async (dateId: number, slotId: number) => {
+  const handleSlotNext = (dateId: number, slotId: number, date: string, time: string, vehicleTime: string) => {
     setSelectedDateId(dateId);
     setSelectedSlotId(slotId);
-
-    const datesRes = await fetch('/api/dates');
-    const dates = await datesRes.json();
-    const dateObj = dates.find((d: any) => d.id === dateId);
-    if (dateObj) {
-      setSelectedDateStr(formatLongDate(dateObj.date));
+    if (date) {
+      setSelectedDateStr(formatLongDate(date));
     }
-
-    const slotsRes = await fetch(`/api/slots?date_id=${dateId}`);
-    const slots = await slotsRes.json();
-    const slotObj = slots.find((s: any) => s.id === slotId);
-    if (slotObj) {
-      setSelectedTimeStr(slotObj.time);
-      setSelectedVehicleTimeStr(slotObj.vehicle_time || '');
+    if (time) {
+      setSelectedTimeStr(time);
+      setSelectedVehicleTimeStr(vehicleTime || '');
       setTicketCount(1);
     }
-
     setStep(1);
   };
 
@@ -985,38 +975,6 @@ export default function BookPageClient() {
       paymentBusyRef.current = false;
     }
   };
-
-  if (settingsError) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-10 flex items-center justify-center">
-        <div className="text-center max-w-md p-8">
-          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Connection Error</h2>
-          <p className="text-gray-500 mb-6">{settingsError}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="btn-primary"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!settings) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-10">
-        <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-10">

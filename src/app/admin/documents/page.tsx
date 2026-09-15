@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import LoadingButton from '@/components/ui/LoadingButton';
 import { getISTComponents, formatDateOnly } from '@/lib/dates';
 
@@ -14,7 +14,6 @@ export default function AdminDocuments() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
   const loadFiles = useCallback(async (isBackground = false) => {
     if (!isBackground) setLoading(true);
@@ -35,15 +34,13 @@ export default function AdminDocuments() {
 
   useEffect(() => {
     loadFiles();
-    // Aggressive polling every 5 seconds
-    intervalRef.current = setInterval(() => loadFiles(true), 5000);
-    // Refresh when tab becomes visible again
+    // Refresh when the tab becomes visible again (catches new bookings made
+    // while the admin was away) — no background polling needed.
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') loadFiles(true);
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
-      clearInterval(intervalRef.current);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [loadFiles]);
@@ -92,7 +89,7 @@ export default function AdminDocuments() {
         </LoadingButton>
       </div>
       <p className="text-gray-500 mb-6">
-        One Excel file per travel date, grouped by Exam Center and Slot. Auto-refreshes every 5 seconds.
+        One Excel file per travel date, grouped by Exam Center and Slot. Refreshes when the page or tab is revisited.
       </p>
 
       <div className="glass-card overflow-hidden">
