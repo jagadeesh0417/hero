@@ -87,6 +87,7 @@ export async function fetchPayment(paymentId: string): Promise<RazorpayPaymentDe
 export interface OrderStatus {
   id: string;
   status: string;
+  amount: number;
   amount_paid: number;
   amount_due: number;
   attempts: number;
@@ -98,6 +99,7 @@ export async function fetchOrderStatus(orderId: string): Promise<OrderStatus> {
   return {
     id: order.id,
     status: order.status,
+    amount: Number(order.amount) || 0,
     amount_paid: Number(order.amount_paid) || 0,
     amount_due: Number(order.amount_due) || 0,
     attempts: Number(order.attempts) || 0,

@@ -9,6 +9,29 @@ import { slotLabel, to12h, EXAM_CENTERS } from '@/lib/slots';
 import LoadingButton from '@/components/ui/LoadingButton';
 import { formatDateOnly, formatLongDate } from '@/lib/dates';
 
+function normalizeContact(phone?: string): string {
+  if (!phone) return '';
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 10) return `+91${digits}`;
+  if (digits.length === 12 && digits.startsWith('91')) return `+${digits}`;
+  return phone;
+}
+
+function ensureRazorpayLoaded(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if ((window as any).Razorpay) {
+      resolve();
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load Razorpay checkout. Please check your connection and retry.'));
+    document.body.appendChild(script);
+  });
+}
+
 interface DateOption {
   id: number;
   date: string;
@@ -708,14 +731,6 @@ export default function BookPageClient() {
   }, []);
 
   useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.async = true;
-    document.body.appendChild(script);
-    return () => { document.body.removeChild(script); };
-  }, []);
-
-  useEffect(() => {
     const error = searchParams.get('error');
     const bid = searchParams.get('id');
     if (bid) {
@@ -872,7 +887,6 @@ export default function BookPageClient() {
       console.log(`[Payment] Order created: ${data.order_id}, amount: ${data.amount}`);
 
       const receiptToken = data.receipt_token;
-      const navToStatus = () => router.push(`/booking/${bookingId}?t=${receiptToken}`);
 
       // Fire checkout events
       const fireEvent = (event: string, detail?: string) => {
@@ -885,59 +899,7 @@ export default function BookPageClient() {
 
       fireEvent('checkout_opened', `amount=${data.amount}`);
 
-      // Shared state between callbacks to prevent duplicate processing
       let paymentCompleted = false;
-      let pollingInterval: ReturnType<typeof setInterval> | null = null;
-      let pollingStopped = false;
-
-      const stopPolling = () => {
-        pollingStopped = true;
-        if (pollingInterval) {
-          clearInterval(pollingInterval);
-          pollingInterval = null;
-        }
-      };
-
-      // Start polling as fallback for desktop QR / UPI payments
-      // where the Razorpay handler callback may not fire reliably
-      const startPolling = () => {
-        const startTime = Date.now();
-        const maxWait = 5 * 60 * 1000; // 5 minutes
-
-        pollingInterval = setInterval(async () => {
-          if (pollingStopped || paymentCompleted) return;
-          if (Date.now() - startTime > maxWait) {
-            stopPolling();
-            if (!paymentCompleted) {
-              console.log(`[Payment] Polling timed out for booking ${bookingId}`);
-              setPaymentError('Payment verification timed out. Check your booking or contact support.');
-              setProcessing(false);
-              paymentBusyRef.current = false;
-            }
-            return;
-          }
-
-          try {
-            const statusRes = await fetch(`/api/razorpay/status?booking_id=${bookingId}`);
-            const statusData = await statusRes.json();
-
-            if (statusData.status === 'confirmed' || statusData.status === 'paid_detected') {
-              console.log(`[Payment] Polling detected confirmed/payment for ${bookingId}`);
-              paymentCompleted = true;
-              stopPolling();
-              navToStatus();
-            } else if (statusData.status === 'failed' || statusData.status === 'error') {
-              stopPolling();
-              console.log(`[Payment] Polling detected failure for ${bookingId}: ${statusData.error || ''}`);
-              setPaymentError(statusData.error || 'Payment failed. Please try again.');
-              setProcessing(false);
-              paymentBusyRef.current = false;
-            }
-          } catch (pollErr) {
-            console.error('[Payment] Status polling error:', pollErr);
-          }
-        }, 3000);
-      };
 
       const options = {
         key: data.key_id,
@@ -946,13 +908,24 @@ export default function BookPageClient() {
         name: 'Suman Travels',
         description: `Booking ${bookingId}`,
         order_id: data.order_id,
+        // Redirect (hosted) checkout — the checkout runs on Razorpay's own
+        // domain in the top frame, which is required for UPI Intent to work on
+        // Android mobile web. In the embedded modal (iframe) Razorpay cannot
+        // launch the customer's UPI apps and falls back to the deprecated UPI
+        // Collect screen ("Enter payer's number"), which fails with
+        // "Login Failed". Razorpay returns to callback_url with the payment
+        // IDs + signature; the callback API verifies and confirms the booking.
+        redirect: true,
+        callback_url: `${window.location.origin}/api/razorpay/callback`,
         prefill: {
           name: data.customer_name || '',
-          contact: data.customer_mobile || '',
+          contact: normalizeContact(data.customer_mobile),
         },
         theme: { color: '#1e3a5f' },
         handler: async function (response: any) {
-          stopPolling();
+          // In redirect mode the handler is not invoked — Razorpay redirects to
+          // callback_url where the payment is verified server-side. Kept as a
+          // safety net for any checkout path that still runs the modal.
           if (paymentCompleted) return;
           paymentCompleted = true;
           console.log(`[Payment] Razorpay handler fired: payment_id=${response.razorpay_payment_id}`);
@@ -972,7 +945,7 @@ export default function BookPageClient() {
 
             if (verifyRes.ok) {
               console.log(`[Payment] Payment verified, navigating to status page for ${bookingId}`);
-              navToStatus();
+              router.push(`/booking/${bookingId}?t=${receiptToken}`);
             } else {
               const errData = await verifyRes.json();
               console.error(`[Payment] Verification failed: ${errData.error || ''}`);
@@ -987,24 +960,15 @@ export default function BookPageClient() {
             paymentBusyRef.current = false;
           }
         },
-        modal: {
-          ondismiss: function () {
-            console.log(`[Payment] Modal dismissed by user for booking ${bookingId}`);
-            stopPolling();
-            if (!paymentCompleted) {
-              fireEvent('modal_dismissed', '');
-              setPaymentError('Payment cancelled. You can try again or go back.');
-              setProcessing(false);
-              paymentBusyRef.current = false;
-            }
-          },
-        },
       };
+
+      // Only open the checkout once the Razorpay script is present, so the
+      // hosted checkout reliably opens the first time the customer clicks Pay.
+      await ensureRazorpayLoaded();
 
       const rzp = new (window as any).Razorpay(options);
       rzp.on('payment.failed', function (response: any) {
         console.log(`[Payment] Payment failed for booking ${bookingId}: ${response.error?.description || 'Unknown error'}`);
-        stopPolling();
         paymentCompleted = true;
         fireEvent('payment_failed', response.error?.description || '');
         setPaymentError('Payment failed: ' + (response.error?.description || 'Please try again.'));
@@ -1013,9 +977,6 @@ export default function BookPageClient() {
       });
       rzp.open();
       setProcessing(false);
-
-      // Start polling fallback after modal opens
-      startPolling();
     } catch (err) {
       console.error('[Booking] handleRazorpayPayment error:', err);
       setPaymentError('Could not connect to payment gateway. Please try again.');

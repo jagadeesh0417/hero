@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { dbExecute, rowToObject } from '@/lib/db';
-import { createOrder, assertRazorpayEnv } from '@/lib/razorpay';
+import { createOrder, assertRazorpayEnv, fetchOrderStatus } from '@/lib/razorpay';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,7 +38,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid booking amount' }, { status: 400 });
     }
 
-    const order = await createOrder(amount, booking_id);
+    const expectedAmountPaise = Math.round(amount * 100);
+
+    // Reuse an existing Razorpay order when the booking already has one that is
+    // still payable. Razorpay supports retries against the same order_id, so a
+    // retry/cancelled checkout must NOT create a duplicate order.
+    const existingOrderId = (booking.razorpay_order_id as string) || '';
+    let order: { id: string; amount: number; currency: string } | null = null;
+    let reusedOrder = false;
+
+    if (existingOrderId) {
+      try {
+        const existing = await fetchOrderStatus(existingOrderId);
+        const isPayable =
+          (existing.status === 'created' || existing.status === 'attempted') &&
+          existing.amount === expectedAmountPaise &&
+          existing.amount_due > 0;
+        if (isPayable) {
+          order = { id: existingOrderId, amount: existing.amount_due, currency: 'INR' };
+          reusedOrder = true;
+          console.log(`[create-order] Reusing existing order ${existingOrderId} for booking ${booking_id}`);
+        }
+      } catch (err: unknown) {
+        console.warn(`[create-order] Reuse check failed for ${existingOrderId} (${err instanceof Error ? err.message : err}) — will create a new order`);
+      }
+    }
+
+    if (!order) {
+      order = await createOrder(amount, booking_id);
+      console.log(`[create-order] Created new order ${order.id} for booking ${booking_id}, amount_paise=${expectedAmountPaise}`);
+    }
 
     const passengersResult = await dbExecute(
       'SELECT name, mobile FROM passengers WHERE booking_id = ? ORDER BY id LIMIT 1',
@@ -54,12 +83,12 @@ export async function POST(request: NextRequest) {
       [order.id, primaryPassenger.name || '', primaryPassenger.mobile || '', receiptToken, booking_id]
     );
 
-    // Log payment event
+    // Log payment event (order_created for fresh orders, order_reused on retry)
     try {
       await dbExecute(
         `INSERT INTO payment_events (razorpay_order_id, razorpay_payment_id, event, status, amount, booking_id, created_at)
          VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`,
-        [order.id, '', 'order_created', 'created', Math.round(amount * 100), booking_id]
+        [order.id, '', reusedOrder ? 'order_reused' : 'order_created', 'created', Math.round(amount * 100), booking_id]
       );
     } catch (e: any) {
       console.error('[create-order] logPaymentEvent error:', e?.message || e);
