@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dbExecute, rowsToObjects, getDb } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth';
-import { expireSlots, calcExpiresAt } from '@/lib/expiry';
+import { calcExpiresAt } from '@/lib/expiry';
 
 export async function GET() {
   try {
-    await expireSlots();
     const result = await dbExecute('SELECT * FROM dates ORDER BY date DESC');
     return NextResponse.json(rowsToObjects(result));
   } catch (err: any) {

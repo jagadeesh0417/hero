@@ -1,12 +1,9 @@
-import Reveal from '@/components/ui/Reveal';
-
 export default function ContactSection() {
   const primaryPhone = '+919010532226';
   const secondaryPhone = '+918639511463';
 
   return (
-    <Reveal>
-      <section className="py-20 bg-gray-50" id="contact">
+    <section className="py-20 bg-gray-50 content-visible" id="contact">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl sm:text-4xl font-bold text-[#1e3a5f] mb-4">
@@ -102,6 +99,5 @@ export default function ContactSection() {
           </div>
         </div>
       </section>
-    </Reveal>
   );
 }

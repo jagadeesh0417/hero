@@ -68,6 +68,13 @@ body {
 .stagger-4 { animation-delay: 0.4s; }
 .stagger-5 { animation-delay: 0.5s; }
 
+/* Performance: avoid rendering work for off-screen sections */
+.content-visible {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 500px;
+  contain: layout style paint;
+}
+
 .card-hover {
   transition: all 0.3s ease;
 }
@@ -164,10 +171,10 @@ body {
 
 .glass-card {
   background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 1rem;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+  contain: layout style;
 }
 
 .gradient-primary {

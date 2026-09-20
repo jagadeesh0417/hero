@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+const year = new Date().getFullYear();
+
 export default function Footer() {
   return (
     <footer className="bg-[#1e3a5f] text-white">
@@ -30,18 +32,12 @@ export default function Footer() {
             <h3 className="text-lg font-bold mb-3">Contact</h3>
             <ul className="space-y-2 text-sm text-gray-300">
               <li>
-                <a
-                  href="tel:+919010532226"
-                  className="hover:text-white transition-colors"
-                >
+                <a href="tel:+919010532226" className="hover:text-white transition-colors">
                   +91 9010532226
                 </a>
               </li>
               <li>
-                <a
-                  href="tel:+918639511463"
-                  className="hover:text-white transition-colors"
-                >
+                <a href="tel:+918639511463" className="hover:text-white transition-colors">
                   +91 8639511463
                 </a>
               </li>
@@ -51,7 +47,7 @@ export default function Footer() {
           </div>
         </div>
         <div className="border-t border-gray-600 mt-8 pt-8 text-center text-sm text-gray-400">
-          &copy; {new Date().getFullYear()} Suman Travels. All rights reserved.
+          &copy; {year} Suman Travels. All rights reserved.
         </div>
       </div>
     </footer>
