@@ -268,6 +268,36 @@ export async function confirmBooking(
         return { success: false, error: 'Could not assign serial number. Please try again.' };
       }
 
+      // ---- Vehicle seat accounting (Part 4/8/9 of requirements) ----
+      // Runs inside the same transaction as the confirmation update, so seats
+      // are only consumed when the booking is actually confirmed, exactly once.
+      // The guarded UPDATE is the server-side overbooking protection: it fails
+      // atomically when another booking took the remaining seats meanwhile.
+      const vehicleId = booking.vehicle_id != null ? Number(booking.vehicle_id) : 0;
+      if (vehicleId > 0) {
+        const { incrementVehicleBookedSeats, getVehicleInTx } = await import('@/lib/vehicles');
+        const seatCount = Number(booking.passenger_count) || 0;
+        const ok = await incrementVehicleBookedSeats(tx as any, vehicleId, seatCount);
+        if (!ok) {
+          await tx.rollback();
+          console.error(`[confirmBooking] ✗ No seats left on vehicle ${vehicleId} for booking ${booking_id} — seats not deducted, booking left pending`);
+          return {
+            success: false,
+            error: 'The selected vehicle no longer has enough seats. Please contact support — your payment will be reconciled.',
+          };
+        }
+        // Refresh the vehicle snapshot on the booking so the receipt always
+        // shows the details that were valid at confirmation time (Part 14).
+        const vehicle = await getVehicleInTx(tx as any, vehicleId);
+        if (vehicle) {
+          await tx.execute({
+            sql: `UPDATE bookings SET vehicle_type = ?, vehicle_number = ?, vehicle_departure_time = ?, vehicle_arrival_time = ? WHERE booking_id = ?`,
+            args: [vehicle.vehicle_type, vehicle.vehicle_number, vehicle.departure_time, vehicle.arrival_time, booking_id],
+          });
+        }
+        console.log(`[confirmBooking] + Vehicle ${vehicleId} booked_seats +${seatCount} for booking ${booking_id}`);
+      }
+
       await tx.commit();
       console.log(`[confirmBooking] ✓ Booking ${booking_id} confirmed with serial ${serialNumber}`);
 

@@ -15,6 +15,11 @@ interface Stats {
   availableSeats: number;
   upcomingSlots: number;
   expiredSlots: number;
+  examSlots: number;
+  totalVehicles: number;
+  vehicleCapacity: number;
+  vehicleBookedSeats: number;
+  vehicleAvailableSeats: number;
 }
 
 export default function AdminDashboard() {
@@ -81,6 +86,39 @@ export default function AdminDashboard() {
     },
   ];
 
+  const examSlotCards = [
+    {
+      label: 'Exam Slots',
+      value: stats?.examSlots ?? 0,
+      icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+      color: 'bg-[#1e3a5f]/10 text-[#1e3a5f]',
+    },
+    {
+      label: 'Active Slots',
+      value: stats?.upcomingSlots ?? 0,
+      icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+      color: 'bg-green-50 text-green-600',
+    },
+    {
+      label: 'Vehicles',
+      value: stats?.totalVehicles ?? 0,
+      icon: 'M5 13l4 4L19 7',
+      color: 'bg-indigo-50 text-indigo-600',
+    },
+    {
+      label: 'Available Seats',
+      value: stats?.vehicleAvailableSeats ?? 0,
+      icon: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z',
+      color: 'bg-teal-50 text-teal-600',
+    },
+    {
+      label: 'Booked Seats',
+      value: stats?.vehicleBookedSeats ?? 0,
+      icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z',
+      color: 'bg-amber-50 text-amber-600',
+    },
+  ];
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -114,6 +152,31 @@ export default function AdminDashboard() {
         ))}
       </div>
 
+      <div className="glass-card p-6 mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="font-bold text-gray-900">Exam Slots &amp; Vehicles</h2>
+            <p className="text-sm text-gray-500 mt-0.5">Live seat availability across all configured exam slots</p>
+          </div>
+          <Link href="/admin/exam-slots" className="text-sm font-medium text-[#1e3a5f] hover:underline">
+            Manage →
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          {examSlotCards.map((card) => (
+            <div key={card.label} className="p-4 rounded-xl bg-gray-50/70">
+              <div className={`w-10 h-10 rounded-lg ${card.color} flex items-center justify-center mb-3`}>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={card.icon} />
+                </svg>
+              </div>
+              <p className="text-xl font-bold text-gray-900">{card.value}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{card.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="grid sm:grid-cols-2 gap-4 mb-8">
         <Link
           href="/admin/dates"
@@ -142,6 +205,21 @@ export default function AdminDashboard() {
           <div>
             <h3 className="font-bold text-gray-900">Manage Slots</h3>
             <p className="text-sm text-gray-500">Configure time slots</p>
+          </div>
+        </Link>
+
+        <Link
+          href="/admin/exam-slots"
+          className="glass-card p-6 card-hover flex items-center gap-4"
+        >
+          <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="font-bold text-gray-900">Exam Slots &amp; Vehicles</h3>
+            <p className="text-sm text-gray-500">Create exam slots with vehicle timings</p>
           </div>
         </Link>
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use, useCallback } from 'react';
 import Link from 'next/link';
-import { slotLabel } from '@/lib/slots';
+import { slotLabel, to12h } from '@/lib/slots';
 import LoadingButton from '@/components/ui/LoadingButton';
 import { formatTimestamp } from '@/lib/dates';
 
@@ -17,6 +17,10 @@ interface BookingDetail {
   date: string;
   time: string;
   exam_center?: string;
+  vehicle_type?: string;
+  vehicle_number?: string;
+  vehicle_departure_time?: string;
+  vehicle_arrival_time?: string;
   passenger_count: number;
   amount: number;
   payment_status: string;
@@ -195,6 +199,26 @@ export default function BookingDetailPage({
               <div className="flex justify-between">
                 <span className="text-gray-500">Exam Center</span>
                 <span className="font-medium text-right max-w-[200px]">{booking.exam_center}</span>
+              </div>
+            )}
+            {booking.vehicle_number && (
+              <div className="border-t pt-3 mt-3">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Vehicle</p>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Type & Number</span>
+                  <span className="font-medium text-right">
+                    {booking.vehicle_type || '-'}{' '}
+                    <span className="font-mono text-sm">({booking.vehicle_number})</span>
+                  </span>
+                </div>
+                <div className="flex justify-between mt-2">
+                  <span className="text-gray-500">Departure → Arrival</span>
+                  <span className="font-medium text-orange-600">
+                    {booking.vehicle_departure_time ? to12h(booking.vehicle_departure_time) : '-'}
+                    {' → '}
+                    {booking.vehicle_arrival_time ? to12h(booking.vehicle_arrival_time) : '-'}
+                  </span>
+                </div>
               </div>
             )}
             <div className="flex justify-between">

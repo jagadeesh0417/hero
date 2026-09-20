@@ -113,6 +113,7 @@ export async function DELETE(request: NextRequest) {
     const tx = await db.transaction('write');
 
     try {
+      await tx.execute({ sql: 'DELETE FROM vehicles WHERE slot_id IN (SELECT id FROM slots WHERE date_id = ?)', args: [dateId] });
       await tx.execute({ sql: 'DELETE FROM slots WHERE date_id = ?', args: [dateId] });
       await tx.execute({ sql: "DELETE FROM bookings WHERE date_id = ? AND payment_status != 'confirmed'", args: [dateId] });
       await tx.commit();

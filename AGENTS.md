@@ -14,15 +14,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
    - `src/lib/excel.ts` — `generateDateExcel()` and `generateAllDatesExcel()`
    - `GET /api/documents?download=YYYY-MM-DD` streams .xlsx; no params returns dates with counts
    - Admin Documents page shows one file per travel date
-5. **BharatPe payment gateway integration** (partial — API routes done, booking page updated):
-   - `src/lib/bharatpe.ts` — `createPaymentOrder()`, `verifyPayment()`, `verifyWebhookSignature()`
-   - `POST /api/bharatpe/create-order` — Creates order, returns payment URL for redirect
-   - `GET /api/bharatpe/callback` — Handles redirect from BharatPe, updates booking, redirects to success/failure
-   - `POST /api/bharatpe/webhook` — Server-side payment status update via webhook
-   - Book page: Replaced `StepUPIPayment` (QR + UTR) with `StepBharatPePayment` (redirect + retry)
-   - Admin booking detail: Shows BharatPe order ID, txn ID, payment timestamp
-   - DB migration: `bharatpe_order_id`, `bharatpe_txn_id`, `payment_timestamp` columns in `bookings`
-   - All commits pushed to GitHub; Vercel auto-deploys
+5. **BharatPe removed** — BharatPe integration was scrapped; Razorpay is the only payment gateway
 6. **Razorpay payment flow audit and fix** (complete end-to-end):
    - **Root cause found**: `/api/bookings/[bookingId]/status` returned `paid_detected` without calling `confirmBooking()`. If the webhook (`RAZORPAY_WEBHOOK_SECRET` unset) and handler callback both didn't fire, the booking stayed `pending` forever despite successful payment.
    - **Fix**: Status endpoint now fetches captured payment from Razorpay and actively calls `confirmBooking()` when `order.status === 'paid'`, then returns `confirmed` with serial number. The `paid_detected` fallback still exists but is rarely hit.
@@ -37,7 +29,3 @@ This version has breaking changes — APIs, conventions, and file structure may 
    - Admin booking list: "Confirm" button for pending bookings, shows "Confirmed Manually" badge (blue)
    - Admin booking detail: "Confirm Booking" card with modal dialog ("Are you sure...")
    - Existing auto-confirmation via Razorpay/webhook remains completely untouched
-
-### Remaining (BharatPe)
-- Configure `BHARATPE_API_KEY`, `BHARATPE_API_SECRET`, `BHARATPE_MERCHANT_ID`, `BHARATPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_BASE_URL` in Vercel env vars
-- Test end-to-end flow on production after env vars set

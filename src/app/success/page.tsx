@@ -15,6 +15,10 @@ interface BookingData {
   time: string;
   vehicle_time?: string;
   exam_center?: string;
+  vehicle_type?: string;
+  vehicle_number?: string;
+  vehicle_departure_time?: string;
+  vehicle_arrival_time?: string;
   passenger_count: number;
   amount: number;
   receipt_token?: string;
@@ -164,7 +168,21 @@ export default function SuccessPage({
               <span className="text-gray-500">Exam Time</span>
               <span className="font-semibold">{slotLabel(booking.time)}</span>
             </div>
-            {booking.vehicle_time && (
+            {booking.vehicle_type && booking.vehicle_number ? (
+              <div className="flex justify-between items-center py-2 border-b border-gray-50">
+                <span className="text-gray-500">Vehicle</span>
+                <span className="font-semibold text-right">
+                  {booking.vehicle_type} ({booking.vehicle_number})
+                  {(booking.vehicle_departure_time || booking.vehicle_arrival_time) && (
+                    <span className="block text-xs font-medium text-orange-600">
+                      {booking.vehicle_departure_time ? to12h(booking.vehicle_departure_time) : ''}
+                      {booking.vehicle_departure_time && booking.vehicle_arrival_time ? ' → ' : ''}
+                      {booking.vehicle_arrival_time ? to12h(booking.vehicle_arrival_time) : ''}
+                    </span>
+                  )}
+                </span>
+              </div>
+            ) : booking.vehicle_time && (
               <div className="flex justify-between items-center py-2 border-b border-gray-50">
                 <span className="text-gray-500">Vehicle</span>
                 <span className="font-semibold text-orange-600">{to12h(booking.vehicle_time)}</span>

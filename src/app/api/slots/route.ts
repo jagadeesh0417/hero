@@ -3,6 +3,7 @@ import { dbExecute, rowsToObjects } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth';
 import { cleanupExpiredDates } from '@/lib/cleanup';
 import { expireSlots } from '@/lib/expiry';
+import { getVehiclesForSlots, isVehicleSelectable } from '@/lib/vehicles';
 
 export async function GET(request: NextRequest) {
   try {
@@ -27,7 +28,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(rowsToObjects(result));
+    const slots = rowsToObjects(result);
+
+    // Attach vehicles (backward compatible: old slots simply get an empty list).
+    // Public queries only receive selectable vehicles (available + free seats);
+    // the admin query receives everything for management.
+    const slotIds = slots.map((s) => Number(s.id)).filter((id) => !isNaN(id));
+    const vehiclesMap = await getVehiclesForSlots(slotIds);
+    const isAdminQuery = !dateId;
+    for (const s of slots) {
+      const all = vehiclesMap.get(Number(s.id)) || [];
+      s.vehicles = isAdminQuery ? all : all.filter((v) => isVehicleSelectable(v));
+    }
+
+    return NextResponse.json(slots);
   } catch (err: any) {
     console.error('[API /slots] GET error:', err?.message || err);
     return NextResponse.json({ error: 'Failed to fetch slots' }, { status: 500 });
@@ -97,6 +111,7 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
 
+    await dbExecute('DELETE FROM vehicles WHERE slot_id = ?', [Number(id)]);
     await dbExecute('DELETE FROM slots WHERE id = ?', [Number(id)]);
     return NextResponse.json({ message: 'Slot deleted' });
   } catch (err: any) {

@@ -18,6 +18,7 @@ export async function cleanupExpiredDates(): Promise<number> {
     const expiredIds = expiredResult.rows.map((r: any) => r.id);
 
     for (const id of expiredIds) {
+      await dbExecute('DELETE FROM vehicles WHERE slot_id IN (SELECT id FROM slots WHERE date_id = ?)', [id]);
       await dbExecute('DELETE FROM slots WHERE date_id = ?', [id]);
       await dbExecute('DELETE FROM bookings WHERE date_id = ? AND payment_status != \'confirmed\'', [id]);
       const remaining = await dbExecute(

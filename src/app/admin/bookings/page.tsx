@@ -17,6 +17,10 @@ interface BookingRecord {
   date: string;
   time: string;
   exam_center?: string;
+  vehicle_type?: string;
+  vehicle_number?: string;
+  vehicle_departure_time?: string;
+  vehicle_arrival_time?: string;
   passenger_count: number;
   amount: number;
   payment_status: string;
@@ -121,6 +125,7 @@ export default function AdminBookings() {
                 <th className="text-left p-3 text-xs font-semibold text-gray-700 whitespace-nowrap">Email</th>
                 <th className="text-left p-3 text-xs font-semibold text-gray-700 whitespace-nowrap">Exam Date</th>
                 <th className="text-left p-3 text-xs font-semibold text-gray-700 whitespace-nowrap">Slot</th>
+                <th className="text-left p-3 text-xs font-semibold text-gray-700 whitespace-nowrap">Vehicle</th>
                 <th className="text-left p-3 text-xs font-semibold text-gray-700 whitespace-nowrap">Exam Center</th>
                 <th className="text-center p-3 text-xs font-semibold text-gray-700 whitespace-nowrap">Tickets</th>
                 <th className="text-center p-3 text-xs font-semibold text-gray-700 whitespace-nowrap">Status</th>
@@ -134,7 +139,7 @@ export default function AdminBookings() {
             <tbody>
               {bookings.length === 0 && (
                 <tr>
-                  <td colSpan={16} className="p-8 text-center text-gray-500">
+                  <td colSpan={17} className="p-8 text-center text-gray-500">
                     No bookings found
                   </td>
                 </tr>
@@ -161,6 +166,16 @@ export default function AdminBookings() {
                       {formatDateOnly(b.date, { day: 'numeric', month: 'short', year: 'numeric' })}
                     </td>
                     <td className="p-3 whitespace-nowrap text-sm text-gray-700">{slotLabel(b.time)}</td>
+                    <td className="p-3 whitespace-nowrap text-sm text-gray-700">
+                      {b.vehicle_number ? (
+                        <span title={b.vehicle_departure_time ? `Departs ${b.vehicle_departure_time}` : b.vehicle_type}>
+                          {b.vehicle_type ? `${b.vehicle_type} · ` : ''}
+                          <span className="font-mono text-xs">{b.vehicle_number}</span>
+                        </span>
+                      ) : (
+                        '-'
+                      )}
+                    </td>
                     <td className="p-3 whitespace-nowrap text-sm text-gray-600 max-w-[180px] truncate" title={b.exam_center || ''}>
                       {b.exam_center || '-'}
                     </td>

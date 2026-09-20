@@ -73,6 +73,7 @@ async function getBookingsForDate(dateStr: string) {
             b.razorpay_payment_id, b.razorpay_order_id, b.razorpay_bank_ref,
             b.razorpay_status, b.razorpay_method, b.payment_timestamp,
             b.customer_name, b.customer_mobile, b.customer_email,
+            b.vehicle_type, b.vehicle_number,
             d.date, s.time,
             (SELECT p.name FROM passengers p WHERE p.booking_id = b.booking_id ORDER BY p.id LIMIT 1) as name,
             (SELECT p.mobile FROM passengers p WHERE p.booking_id = b.booking_id ORDER BY p.id LIMIT 1) as mobile,

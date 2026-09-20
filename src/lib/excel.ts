@@ -11,6 +11,8 @@ export interface BookingRow {
   exam_center: string;
   date: string;
   time: string;
+  vehicle_type?: string;
+  vehicle_number?: string;
   passenger_count: number;
   amount: number;
   payment_status: string;
@@ -32,6 +34,7 @@ const HEADER_COLUMNS = [
   'Exam Center',
   'Travel Date',
   'Slot',
+  'Vehicle',
   'Passengers',
   'Amount (₹)',
   'Payment Status',
@@ -41,7 +44,12 @@ const HEADER_COLUMNS = [
   'Booking Date & Time',
 ];
 
-const COL_WIDTHS = [10, 14, 22, 16, 10, 36, 16, 18, 12, 14, 16, 24, 24, 24, 20];
+const COL_WIDTHS = [10, 14, 22, 16, 10, 36, 16, 18, 20, 12, 14, 16, 24, 24, 24, 20];
+
+function mergeRange(rowNumber: number): string {
+  // 16 columns → A..P
+  return `A${rowNumber}:P${rowNumber}`;
+}
 
 function formatDate(dateStr: string): string {
   const { dd, mm, yyyy } = getISTComponents(dateStr);
@@ -91,7 +99,7 @@ export async function generateDateExcel(
   // Title row
   const titleRow = ws.addRow([`Travel Date: ${formatDate(dateStr)}`]);
   titleRow.font = titleFont;
-  ws.mergeCells(`A${titleRow.number}:O${titleRow.number}`);
+  ws.mergeCells(mergeRange(titleRow.number));
   titleRow.height = 30;
 
   ws.addRow([]); // spacer
@@ -106,13 +114,11 @@ export async function generateDateExcel(
     groups[center][slot].push(b);
   }
 
-  let rowNum = ws.rowCount;
-
   for (const [center, slots] of Object.entries(groups)) {
     // Exam Center header row
     const centerRow = ws.addRow([`EXAM CENTER: ${center}`]);
     centerRow.font = groupFont;
-    ws.mergeCells(`A${centerRow.number}:O${centerRow.number}`);
+    ws.mergeCells(mergeRange(centerRow.number));
     centerRow.height = 24;
     ws.addRow([]);
 
@@ -120,7 +126,7 @@ export async function generateDateExcel(
       // Slot header row
       const slotRow = ws.addRow([slot]);
       slotRow.font = slotFont;
-      ws.mergeCells(`A${slotRow.number}:O${slotRow.number}`);
+      ws.mergeCells(mergeRange(slotRow.number));
       slotRow.height = 22;
 
       // Column headers
@@ -142,6 +148,7 @@ export async function generateDateExcel(
           b.exam_center || 'Not Specified',
           b.date,
           slotLabel(b.time),
+          b.vehicle_number ? `${b.vehicle_type || ''} ${b.vehicle_number}`.trim() : '-',
           b.passenger_count,
           b.amount,
           b.payment_status === 'confirmed' ? 'Confirmed' : b.payment_status,
@@ -192,7 +199,7 @@ export async function generateAllDatesExcel(
 
     const titleRow = ws.addRow([`Travel Date: ${formatDate(dateStr)}`]);
     titleRow.font = titleFont;
-    ws.mergeCells(`A${titleRow.number}:O${titleRow.number}`);
+    ws.mergeCells(mergeRange(titleRow.number));
     titleRow.height = 30;
     ws.addRow([]);
 
@@ -208,14 +215,14 @@ export async function generateAllDatesExcel(
     for (const [center, slots] of Object.entries(groups)) {
       const centerRow = ws.addRow([`EXAM CENTER: ${center}`]);
       centerRow.font = groupFont;
-      ws.mergeCells(`A${centerRow.number}:O${centerRow.number}`);
+      ws.mergeCells(mergeRange(centerRow.number));
       centerRow.height = 24;
       ws.addRow([]);
 
       for (const [slot, rows] of Object.entries(slots)) {
         const slotRow = ws.addRow([slot]);
         slotRow.font = slotFont;
-        ws.mergeCells(`A${slotRow.number}:O${slotRow.number}`);
+        ws.mergeCells(mergeRange(slotRow.number));
         slotRow.height = 22;
 
         const headerRow = ws.addRow(HEADER_COLUMNS);
@@ -235,6 +242,7 @@ export async function generateAllDatesExcel(
             b.exam_center || 'Not Specified',
             b.date,
             slotLabel(b.time),
+            b.vehicle_number ? `${b.vehicle_type || ''} ${b.vehicle_number}`.trim() : '-',
             b.passenger_count,
             b.amount,
             b.payment_status === 'confirmed' ? 'Confirmed' : b.payment_status,

@@ -44,6 +44,10 @@ interface BookingDocData {
   razorpayMethod?: string;
   razorpayBankRef?: string;
   paymentTimestamp?: string;
+  vehicleType?: string;
+  vehicleNumber?: string;
+  vehicleDepartureTime?: string;
+  vehicleArrivalTime?: string;
   passengers: PassengerDoc[];
 }
 
@@ -313,7 +317,36 @@ export async function generateBookingDocument(
             ],
             spacing: { after: 60 },
           }),
-          ...(data.vehicleTime
+          ...(data.vehicleNumber
+            ? [
+                new Paragraph({
+                  children: [
+                    new TextRun({ text: `Vehicle: `, bold: true, size: 20 }),
+                    new TextRun({
+                      text: `${data.vehicleType || ''} (${data.vehicleNumber})`,
+                      size: 20,
+                    }),
+                  ],
+                  spacing: { after: 60 },
+                }),
+                ...(data.vehicleDepartureTime || data.vehicleArrivalTime
+                  ? [
+                      new Paragraph({
+                        children: [
+                          new TextRun({ text: `Vehicle Timing: `, bold: true, size: 20 }),
+                          new TextRun({
+                            text: `${data.vehicleDepartureTime ? to12h(data.vehicleDepartureTime) : ''}${data.vehicleDepartureTime && data.vehicleArrivalTime ? ' → ' : ''}${data.vehicleArrivalTime ? to12h(data.vehicleArrivalTime) : ''}`,
+                            size: 20,
+                            color: 'CC5500',
+                          }),
+                        ],
+                        spacing: { after: 60 },
+                      }),
+                    ]
+                  : []),
+              ]
+            : []),
+          ...(data.vehicleTime && !data.vehicleNumber
             ? [new Paragraph({
                 children: [
                   new TextRun({ text: `Vehicle Start: `, bold: true, size: 20 }),

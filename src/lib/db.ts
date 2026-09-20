@@ -355,6 +355,25 @@ async function ensureSchema(): Promise<void> {
       archived_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`,
     'CREATE INDEX IF NOT EXISTS idx_slots_history_date ON slots_history(date)',
+    // Vehicles assigned to exam slots (one slot can have multiple vehicles).
+    // booked_seats is the source of truth for availability:
+    // available = total_seats - booked_seats.
+    `CREATE TABLE IF NOT EXISTS vehicles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      slot_id INTEGER NOT NULL,
+      vehicle_type TEXT NOT NULL DEFAULT '',
+      vehicle_number TEXT NOT NULL DEFAULT '',
+      driver_name TEXT DEFAULT '',
+      driver_mobile TEXT DEFAULT '',
+      departure_time TEXT NOT NULL DEFAULT '',
+      arrival_time TEXT NOT NULL DEFAULT '',
+      total_seats INTEGER NOT NULL DEFAULT 0,
+      booked_seats INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'available',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (slot_id) REFERENCES slots(id) ON DELETE CASCADE
+    )`,
+    'CREATE INDEX IF NOT EXISTS idx_vehicles_slot_id ON vehicles(slot_id)',
     'CREATE UNIQUE INDEX IF NOT EXISTS idx_slots_date_id_time ON slots(date_id, time)',
     'CREATE INDEX IF NOT EXISTS idx_slots_date_id ON slots(date_id)',
     'CREATE INDEX IF NOT EXISTS idx_bookings_booking_id ON bookings(booking_id)',
@@ -479,7 +498,60 @@ async function ensureSchema(): Promise<void> {
   } catch {
   }
   try {
-    await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN confirmed_at DATETIME DEFAULT NULL" });
+    await client.execute({ sql: 'ALTER TABLE bookings ADD COLUMN confirmed_at DATETIME DEFAULT NULL' });
+  } catch {
+  }
+
+  // Exam slot fields on slots (old rows keep '' / 0 defaults — backward compatible)
+  try {
+    await client.execute({ sql: "ALTER TABLE slots ADD COLUMN exam_name TEXT DEFAULT ''" });
+  } catch {
+  }
+  try {
+    await client.execute({ sql: "ALTER TABLE slots ADD COLUMN reporting_time TEXT DEFAULT ''" });
+  } catch {
+  }
+  try {
+    await client.execute({ sql: "ALTER TABLE slots ADD COLUMN pickup_location TEXT DEFAULT ''" });
+  } catch {
+  }
+  try {
+    await client.execute({ sql: "ALTER TABLE slots ADD COLUMN drop_location TEXT DEFAULT ''" });
+  } catch {
+  }
+  try {
+    await client.execute({ sql: 'ALTER TABLE slots ADD COLUMN price REAL DEFAULT 0' });
+  } catch {
+  }
+  try {
+    await client.execute({ sql: "ALTER TABLE slots ADD COLUMN description TEXT DEFAULT ''" });
+  } catch {
+  }
+
+  // Vehicle snapshot on bookings — historical bookings stay valid even if an
+  // admin later edits or removes the vehicle (Part 14 of requirements).
+  try {
+    await client.execute({ sql: 'ALTER TABLE bookings ADD COLUMN vehicle_id INTEGER DEFAULT NULL' });
+  } catch {
+  }
+  try {
+    await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN vehicle_type TEXT DEFAULT ''" });
+  } catch {
+  }
+  try {
+    await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN vehicle_number TEXT DEFAULT ''" });
+  } catch {
+  }
+  try {
+    await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN vehicle_departure_time TEXT DEFAULT ''" });
+  } catch {
+  }
+  try {
+    await client.execute({ sql: "ALTER TABLE bookings ADD COLUMN vehicle_arrival_time TEXT DEFAULT ''" });
+  } catch {
+  }
+  try {
+    await client.execute({ sql: 'CREATE INDEX IF NOT EXISTS idx_bookings_vehicle_id ON bookings(vehicle_id)' });
   } catch {
   }
 

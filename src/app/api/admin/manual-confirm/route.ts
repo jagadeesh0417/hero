@@ -200,6 +200,28 @@ async function manualConfirmBooking(
         return { success: false, error: 'Could not assign serial number. Please try again.' };
       }
 
+      // ---- Vehicle seat accounting (mirrors confirmBooking in lib/razorpay.ts) ----
+      const vehicleId = booking.vehicle_id != null ? Number(booking.vehicle_id) : 0;
+      if (vehicleId > 0) {
+        const { incrementVehicleBookedSeats, getVehicleInTx } = await import('@/lib/vehicles');
+        const seatCount = Number(booking.passenger_count) || 0;
+        const ok = await incrementVehicleBookedSeats(tx as any, vehicleId, seatCount);
+        if (!ok) {
+          await tx.rollback();
+          return {
+            success: false,
+            error: 'The assigned vehicle no longer has enough seats. Reduce its bookings or increase capacity first.',
+          };
+        }
+        const vehicle = await getVehicleInTx(tx as any, vehicleId);
+        if (vehicle) {
+          await tx.execute({
+            sql: `UPDATE bookings SET vehicle_type = ?, vehicle_number = ?, vehicle_departure_time = ?, vehicle_arrival_time = ? WHERE booking_id = ?`,
+            args: [vehicle.vehicle_type, vehicle.vehicle_number, vehicle.departure_time, vehicle.arrival_time, booking_id],
+          });
+        }
+      }
+
       // Insert audit log
       await tx.execute({
         sql: `INSERT INTO audit_log
