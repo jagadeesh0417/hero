@@ -12,7 +12,7 @@ export async function GET(
       `SELECT b.*, d.date, s.time, s.vehicle_time
        FROM bookings b
        JOIN dates d ON b.date_id = d.id
-       JOIN slots s ON b.slot_id = s.id
+       LEFT JOIN slots s ON b.slot_id = s.id
        WHERE b.booking_id = ?`,
       [bookingId]
     );

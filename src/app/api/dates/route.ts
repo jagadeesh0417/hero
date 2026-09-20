@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dbExecute, rowsToObjects, getDb } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth';
-import { cleanupExpiredDates } from '@/lib/cleanup';
 import { expireSlots, calcExpiresAt } from '@/lib/expiry';
 
 export async function GET() {
   try {
-    await cleanupExpiredDates();
     await expireSlots();
     const result = await dbExecute('SELECT * FROM dates ORDER BY date DESC');
     return NextResponse.json(rowsToObjects(result));
@@ -115,9 +113,10 @@ export async function DELETE(request: NextRequest) {
     try {
       await tx.execute({ sql: 'DELETE FROM vehicles WHERE slot_id IN (SELECT id FROM slots WHERE date_id = ?)', args: [dateId] });
       await tx.execute({ sql: 'DELETE FROM slots WHERE date_id = ?', args: [dateId] });
-      await tx.execute({ sql: "DELETE FROM bookings WHERE date_id = ? AND payment_status != 'confirmed'", args: [dateId] });
+      // Bookings are never deleted by date deletion — only slots and vehicles are removed.
+      // Confirmed and pending booking records are preserved permanently.
       await tx.commit();
-      return NextResponse.json({ message: 'Date slots deleted. Confirmed bookings preserved.' });
+      return NextResponse.json({ message: 'Date slots deleted. All bookings preserved.' });
     } catch (e) {
       await tx.rollback();
       throw e;

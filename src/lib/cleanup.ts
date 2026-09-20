@@ -1,5 +1,10 @@
-import { dbExecute, getDb } from '@/lib/db';
+import { dbExecute } from '@/lib/db';
 
+// Cleanup is intentionally a no-op for bookings.
+// Expired slots are handled by expireSlots() which marks them status='expired'
+// without deleting anything. Booking records are preserved permanently.
+// This function exists as a safe hook for future automated maintenance
+// but currently performs no destructive operations.
 export async function cleanupExpiredDates(): Promise<number> {
   try {
     const now = new Date();
@@ -8,31 +13,19 @@ export async function cleanupExpiredDates(): Promise<number> {
     istMidnight.setDate(istMidnight.getDate() - 3);
     const threshold = istMidnight.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
-    const expiredResult = await dbExecute(
-      'SELECT id, date FROM dates WHERE date < ?',
+    // Remove vehicle assignments for slots belonging to dates older than 3 days
+    // so stale vehicle capacity is not counted toward availability.
+    // Booking records are NEVER touched — they are preserved permanently.
+    await dbExecute(
+      `DELETE FROM vehicles WHERE slot_id IN (
+        SELECT s.id FROM slots s JOIN dates d ON s.date_id = d.id
+        WHERE d.date < ? AND s.status = 'expired'
+      )`,
       [threshold]
     );
 
-    if (expiredResult.rows.length === 0) return 0;
-
-    const expiredIds = expiredResult.rows.map((r: any) => r.id);
-
-    for (const id of expiredIds) {
-      await dbExecute('DELETE FROM vehicles WHERE slot_id IN (SELECT id FROM slots WHERE date_id = ?)', [id]);
-      await dbExecute('DELETE FROM slots WHERE date_id = ?', [id]);
-      await dbExecute('DELETE FROM bookings WHERE date_id = ? AND payment_status != \'confirmed\'', [id]);
-      const remaining = await dbExecute(
-        "SELECT COUNT(*) as cnt FROM bookings WHERE date_id = ? AND payment_status = 'confirmed'",
-        [id]
-      );
-      const row = remaining.rows[0] as any;
-      if (!row || Number(row.cnt) === 0) {
-        await dbExecute('DELETE FROM dates WHERE id = ?', [id]);
-      }
-    }
-
-    console.log(`[Cleanup] Deleted ${expiredIds.length} expired dates (older than 3 days, IST)`);
-    return expiredIds.length;
+    console.log(`[Cleanup] Cleaned up stale vehicles for expired dates older than 3 days (IST)`);
+    return 0;
   } catch (err: any) {
     console.error('[Cleanup] Error:', err?.message || err);
     return 0;

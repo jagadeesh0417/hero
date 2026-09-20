@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
         (SELECT p.gender FROM passengers p WHERE p.booking_id = b.booking_id ORDER BY p.id LIMIT 1) as gender
       FROM bookings b
       JOIN dates d ON b.date_id = d.id
-      JOIN slots s ON b.slot_id = s.id
+      LEFT JOIN slots s ON b.slot_id = s.id
       WHERE 1=1
     `;
     const params: (string | number)[] = [];

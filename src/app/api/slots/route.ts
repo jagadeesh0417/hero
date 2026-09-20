@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dbExecute, rowsToObjects } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth';
-import { cleanupExpiredDates } from '@/lib/cleanup';
 import { expireSlots } from '@/lib/expiry';
 import { getVehiclesForSlots, isVehicleSelectable } from '@/lib/vehicles';
 
 export async function GET(request: NextRequest) {
   try {
-    await cleanupExpiredDates();
     await expireSlots();
     const { searchParams } = new URL(request.url);
     const dateId = searchParams.get('date_id');
