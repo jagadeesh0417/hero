@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { dbExecute, rowsToObjects, getDb } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth';
 import { generateBookingId } from '@/lib/utils';
-import { getVehiclesForSlot, isVehicleSelectable, type VehicleRecord } from '@/lib/vehicles';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,7 +63,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: Request) {
   try {
-    const { date_id, slot_id, passengers, exam_center, vehicle_id } = await request.json();
+    const { date_id, slot_id, passengers, exam_center } = await request.json();
 
     if (!date_id || !slot_id || !passengers || !Array.isArray(passengers) || passengers.length === 0) {
       return NextResponse.json({ error: 'Invalid booking data' }, { status: 400 });
@@ -91,34 +90,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'This exam slot has expired. Please choose another available slot.' }, { status: 400 });
     }
 
-    // ---- Vehicle validation (server-side, Part 6/7/9 of requirements) ----
-    // Slots configured with vehicles require a valid, selectable vehicle.
-    // Legacy slots without vehicles keep working exactly as before.
-    const vehicles = await getVehiclesForSlot(Number(slot_id));
-    const activeVehicles = vehicles.filter((v) => v.status !== 'cancelled');
-    let selectedVehicle: VehicleRecord | null = null;
-
-    if (activeVehicles.length > 0) {
-      if (!vehicle_id) {
-        return NextResponse.json({ error: 'Please select a vehicle for this exam slot.' }, { status: 400 });
-      }
-      selectedVehicle = vehicles.find((v) => v.id === Number(vehicle_id)) || null;
-      if (!selectedVehicle) {
-        return NextResponse.json({ error: 'Selected vehicle is not assigned to this exam slot. Please choose again.' }, { status: 400 });
-      }
-      if (!isVehicleSelectable(selectedVehicle)) {
-        return NextResponse.json({ error: 'The selected vehicle is full or no longer available. Please choose another vehicle.' }, { status: 400 });
-      }
-      if ((selectedVehicle.available_seats ?? 0) < ticketCount) {
-        return NextResponse.json(
-          {
-            error: `Only ${selectedVehicle.available_seats} seat(s) left on ${selectedVehicle.vehicle_type} ${selectedVehicle.vehicle_number}. Please reduce the number of tickets or choose another vehicle.`,
-          },
-          { status: 400 }
-        );
-      }
-    }
-
     // ---- Price: server-side source of truth (Part 15) ----
     // Slot-specific price wins; global setting is the fallback for legacy slots.
     const slotPrice = Number(slot.price);
@@ -137,24 +108,18 @@ export async function POST(request: Request) {
     const tx = await db.transaction('write');
     try {
       await tx.execute({
-        sql: `INSERT INTO bookings
-          (booking_id, date_id, slot_id, passenger_count, amount, payment_status, exam_center,
-           vehicle_id, vehicle_type, vehicle_number, vehicle_departure_time, vehicle_arrival_time)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        args: [
-          bookingId,
-          date_id,
-          slot_id,
-          ticketCount,
-          amount,
-          'pending',
-          exam_center,
-          selectedVehicle ? Number(selectedVehicle.id) : null,
-          selectedVehicle?.vehicle_type || '',
-          selectedVehicle?.vehicle_number || '',
-          selectedVehicle?.departure_time || '',
-          selectedVehicle?.arrival_time || '',
-        ],
+         sql: `INSERT INTO bookings
+           (booking_id, date_id, slot_id, passenger_count, amount, payment_status, exam_center)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         args: [
+           bookingId,
+           date_id,
+           slot_id,
+           ticketCount,
+           amount,
+           'pending',
+           exam_center,
+         ],
       });
 
       for (const p of passengers) {
@@ -170,7 +135,7 @@ export async function POST(request: Request) {
       throw e;
     }
 
-    console.log(`[Booking] Created booking ${bookingId} for ${ticketCount} passengers, ₹${amount}${selectedVehicle ? `, vehicle=${selectedVehicle.vehicle_number}` : ''}`);
+    console.log(`[Booking] Created booking ${bookingId} for ${ticketCount} passengers, ₹${amount}`);
     return NextResponse.json(
       {
         success: true,

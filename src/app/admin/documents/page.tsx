@@ -14,6 +14,8 @@ export default function AdminDocuments() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [generateDate, setGenerateDate] = useState('');
 
   const loadFiles = useCallback(async (isBackground = false) => {
     if (!isBackground) setLoading(true);
@@ -34,8 +36,6 @@ export default function AdminDocuments() {
 
   useEffect(() => {
     loadFiles();
-    // Refresh when the tab becomes visible again (catches new bookings made
-    // while the admin was away) — no background polling needed.
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') loadFiles(true);
     };
@@ -66,6 +66,38 @@ export default function AdminDocuments() {
     setDownloading(null);
   };
 
+  const handleGenerate = async (date?: string) => {
+    const targetDate = date || generateDate;
+    if (!targetDate || generating) return;
+    setGenerating(true);
+    try {
+      const res = await fetch('/api/documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: targetDate }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(err.error || 'Failed to generate report');
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const { dd, mm, yyyy } = getISTComponents(targetDate);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${dd}-${mm}-${yyyy}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('[Documents] handleGenerate error:', err);
+      alert('Failed to generate report.');
+    } finally {
+      setGenerating(false);
+      setGenerateDate('');
+    }
+  };
+
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
@@ -75,21 +107,35 @@ export default function AdminDocuments() {
             <div className="w-4 h-4 border-2 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
           )}
         </div>
-        <LoadingButton
-          onClick={() => loadFiles()}
-          loading={refreshing}
-          loadingText="Refreshing..."
-          variant="ghost"
-          className="px-4 py-2 text-sm font-medium text-[#1e3a5f] bg-[#1e3a5f]/5 hover:bg-[#1e3a5f]/10 self-start"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          Refresh
-        </LoadingButton>
+        <div className="flex gap-2 self-start">
+          <LoadingButton
+            onClick={() => loadFiles()}
+            loading={refreshing}
+            loadingText="Refreshing..."
+            variant="ghost"
+            className="px-4 py-2 text-sm font-medium text-[#1e3a5f] bg-[#1e3a5f]/5 hover:bg-[#1e3a5f]/10"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh
+          </LoadingButton>
+          <LoadingButton
+            onClick={() => handleGenerate()}
+            loading={generating}
+            loadingText="Generating..."
+            variant="primary"
+            className="px-4 py-2 text-sm"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Generate
+          </LoadingButton>
+        </div>
       </div>
       <p className="text-gray-500 mb-6">
-        One Excel file per travel date, grouped by Exam Center and Slot. Refreshes when the page or tab is revisited.
+        One Excel file per travel date, grouped by Exam Center and Slot. Reports generate automatically at 1 AM IST daily and on-demand.
       </p>
 
       <div className="glass-card overflow-hidden">
@@ -114,10 +160,10 @@ export default function AdminDocuments() {
               return (
                 <div
                   key={f.date}
-                  className="flex items-center justify-between px-6 py-4 hover:bg-gray-50/50 transition-colors"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-6 py-4 hover:bg-gray-50/50 transition-colors gap-2"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center flex-shrink-0">
                       <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
@@ -131,18 +177,24 @@ export default function AdminDocuments() {
                       </p>
                     </div>
                   </div>
-                  <LoadingButton
-                    onClick={() => handleDownload(f.date)}
-                    loading={downloading === f.date}
-                    loadingText="Downloading..."
-                    variant="primary"
-                    className="!px-4 !py-2 !text-sm"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.293.707l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    Download
-                  </LoadingButton>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleGenerate(f.date)}
+                      disabled={generating}
+                      className="text-xs text-[#1e3a5f] hover:underline px-2 py-1"
+                    >
+                      Regenerate
+                    </button>
+                    <LoadingButton
+                      onClick={() => handleDownload(f.date)}
+                      loading={downloading === f.date}
+                      loadingText="Downloading..."
+                      variant="primary"
+                      className="!px-4 !py-2 !text-sm"
+                    >
+                      Download
+                    </LoadingButton>
+                  </div>
                 </div>
               );
             })}

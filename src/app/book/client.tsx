@@ -37,19 +37,6 @@ interface DateOption {
   date: string;
 }
 
-interface VehicleOption {
-  id: number;
-  vehicle_type: string;
-  vehicle_number: string;
-  driver_name?: string;
-  departure_time: string;
-  arrival_time: string;
-  total_seats: number;
-  booked_seats: number;
-  available_seats: number;
-  status: string;
-}
-
 interface SlotOption {
   id: number;
   date_id: number;
@@ -62,7 +49,6 @@ interface SlotOption {
   drop_location?: string;
   description?: string;
   price?: number;
-  vehicles?: VehicleOption[];
 }
 
 interface PassengerForm {
@@ -252,9 +238,6 @@ function StepSelectSlot({
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {slots.map((s) => {
                 const isSelected = selectedSlotId === s.id;
-                const selectableVehicles = (s.vehicles || []).filter(
-                  (v) => v.status === 'available' && (v.available_seats ?? 0) > 0
-                );
                 const price = Number(s.price) > 0 ? Number(s.price) : initialPrice;
                 return (
                   <button
@@ -296,21 +279,6 @@ function StepSelectSlot({
                         {s.pickup_location || '—'} → {s.drop_location || '—'}
                       </div>
                     )}
-                    {s.vehicle_time && !selectableVehicles.length && (
-                      <div className="mt-2 text-xs text-orange-600 font-medium">
-                        Vehicle @ {to12h(s.vehicle_time)}
-                      </div>
-                    )}
-                    {selectableVehicles.length > 0 && (
-                      <div className="mt-2 text-xs text-green-600 font-medium">
-                        {selectableVehicles.length} vehicle{selectableVehicles.length > 1 ? 's' : ''} available
-                      </div>
-                    )}
-                    {s.vehicles && s.vehicles.length > 0 && selectableVehicles.length === 0 && (
-                      <div className="mt-2 text-xs text-red-500 font-medium">
-                        All vehicles are full
-                      </div>
-                    )}
                   </button>
                 );
               })}
@@ -336,100 +304,6 @@ function StepSelectSlot({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
         </svg>
       </button>
-    </div>
-  );
-}
-
-function StepSelectVehicle({
-  vehicles,
-  pricePerTicket,
-  selectedVehicleId,
-  onSelect,
-  onBack,
-  onNext,
-}: {
-  vehicles: VehicleOption[];
-  pricePerTicket: number;
-  selectedVehicleId: number | null;
-  onSelect: (vehicleId: number) => void;
-  onBack: () => void;
-  onNext: () => void;
-}) {
-  // Auto-select when only one vehicle is available
-  useEffect(() => {
-    if (vehicles.length === 1) onSelect(vehicles[0].id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicles]);
-
-  return (
-    <div className="animate-fade-in">
-      <h2 className="text-2xl font-bold text-[#1e3a5f] mb-2">Select Your Vehicle</h2>
-      <p className="text-gray-500 mb-6">
-        Choose the vehicle you want to travel in. Seats are confirmed after successful payment.
-      </p>
-
-      {vehicles.length === 0 ? (
-        <div className="text-center py-8 bg-gray-50 rounded-xl mb-6">
-          <p className="text-gray-500">No vehicles are currently available for this slot.</p>
-        </div>
-      ) : (
-        <div className="grid gap-3 mb-8">
-          {vehicles.map((v) => {
-            const selected = selectedVehicleId === v.id;
-            return (
-              <button
-                key={v.id}
-                type="button"
-                onClick={() => onSelect(v.id)}
-                className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
-                  selected
-                    ? 'border-[#1e3a5f] bg-[#1e3a5f]/5 shadow-md'
-                    : 'border-gray-100 hover:border-gray-200 bg-white'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                    selected ? 'border-[#1e3a5f]' : 'border-gray-300'
-                  }`}>
-                    {selected && <div className="w-2.5 h-2.5 rounded-full bg-[#1e3a5f]" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className={`font-bold ${selected ? 'text-[#1e3a5f]' : 'text-gray-900'}`}>
-                        {v.vehicle_type}
-                      </span>
-                      <span className="font-mono text-xs text-gray-500">{v.vehicle_number}</span>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-xs text-gray-500">
-                      <span>Departure: <span className="font-medium text-gray-700">{to12h(v.departure_time)}</span></span>
-                      <span>Arrival: <span className="font-medium text-gray-700">{to12h(v.arrival_time)}</span></span>
-                    </div>
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="text-xs text-green-600 font-medium">
-                        {v.available_seats} seat{(v.available_seats ?? 0) !== 1 ? 's' : ''} available
-                      </span>
-                      <span className="text-sm font-semibold text-[#1e3a5f]">
-                        ₹{pricePerTicket.toLocaleString('en-IN')}/ticket
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      <div className="flex gap-3">
-        <button onClick={onBack} className="btn-outline flex-1 justify-center">Back</button>
-        <button
-          onClick={onNext}
-          disabled={!selectedVehicleId}
-          className="btn-primary flex-1 justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Continue
-        </button>
-      </div>
     </div>
   );
 }
@@ -496,13 +370,11 @@ function StepSelectExamCenter({
 function StepPassengerDetails({
   ticketCount,
   pricePerTicket,
-  vehicleTime,
   onBack,
   onNext,
 }: {
   ticketCount: number;
   pricePerTicket: number;
-  vehicleTime: string;
   onBack: () => void;
   onNext: (passengers: PassengerForm[]) => void;
 }) {
@@ -556,11 +428,6 @@ function StepPassengerDetails({
           {(ticketCount * pricePerTicket).toLocaleString('en-IN')}
         </span>
       </div>
-      {vehicleTime && (
-        <p className="text-orange-600 text-sm font-medium mb-4">
-          Vehicle starts at {to12h(vehicleTime)}
-        </p>
-      )}
 
       <div className="space-y-6">
         {passengers.map((passenger, index) => (
@@ -660,8 +527,6 @@ function StepPassengerDetails({
 function StepSummary({
   selectedDate,
   selectedTime,
-  selectedVehicleTime,
-  selectedVehicle,
   examCenter,
   passengers,
   pricePerTicket,
@@ -671,8 +536,6 @@ function StepSummary({
 }: {
   selectedDate: string;
   selectedTime: string;
-  selectedVehicleTime: string;
-  selectedVehicle: VehicleOption | null;
   examCenter: string;
   passengers: PassengerForm[];
   pricePerTicket: number;
@@ -699,27 +562,11 @@ function StepSummary({
             <span className="text-gray-500">Date</span>
             <span className="font-semibold">{selectedDate}</span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-gray-500">Exam Time</span>
-            <span className="font-semibold">{slotLabel(selectedTime)}</span>
-          </div>
-          {selectedVehicle ? (
-            <div className="flex justify-between gap-4">
-              <span className="text-gray-500">Vehicle</span>
-              <span className="font-semibold text-right">
-                {selectedVehicle.vehicle_type} ({selectedVehicle.vehicle_number})
-                <span className="block text-xs font-medium text-orange-600">
-                  {to12h(selectedVehicle.departure_time)} → {to12h(selectedVehicle.arrival_time)}
-                </span>
-              </span>
-            </div>
-          ) : selectedVehicleTime && (
-            <div className="flex justify-between">
-              <span className="text-gray-500">Vehicle</span>
-              <span className="font-semibold text-orange-600">{to12h(selectedVehicleTime)}</span>
-            </div>
-          )}
-          {examCenter && (
+           <div className="flex justify-between">
+             <span className="text-gray-500">Exam Time</span>
+             <span className="font-semibold">{slotLabel(selectedTime)}</span>
+           </div>
+           {examCenter && (
             <div className="flex justify-between">
               <span className="text-gray-500">Exam Center</span>
               <span className="font-semibold">{examCenter}</span>
@@ -871,11 +718,8 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
   const [selectedDateId, setSelectedDateId] = useState<number | null>(null);
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
   const [selectedDateStr, setSelectedDateStr] = useState('');
-  const [selectedTimeStr, setSelectedTimeStr] = useState('');
-  const [selectedVehicleTimeStr, setSelectedVehicleTimeStr] = useState('');
-  const [slotVehicles, setSlotVehicles] = useState<VehicleOption[]>([]);
-  const [selectedVehicleId, setSelectedVehicleId] = useState<number | null>(null);
-  const [ticketCount, setTicketCount] = useState(1);
+   const [selectedTimeStr, setSelectedTimeStr] = useState('');
+   const [ticketCount, setTicketCount] = useState(1);
   const [passengers, setPassengers] = useState<PassengerForm[]>([]);
   const [examCenter, setExamCenter] = useState('');
   const [processing, setProcessing] = useState(false);
@@ -928,34 +772,21 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
     }
   }, [bookingId, step, router]);
 
-  const [pricePerTicket, setPricePerTicket] = useState(initialPrice);
+   const [pricePerTicket, setPricePerTicket] = useState(initialPrice);
 
-  const slotHasVehicles = slotVehicles.length > 0;
-  const selectedVehicle = slotVehicles.find((v) => v.id === selectedVehicleId) || null;
-  const maxTickets = selectedVehicle
-    ? Math.max(1, Math.min(100, selectedVehicle.available_seats ?? 0))
-    : 100;
+   const maxTickets = 100;
 
-  const steps = slotHasVehicles
-    ? ['Slot', 'Vehicle', 'Tickets', 'Center', 'Details', 'Summary', 'Payment']
-    : ['Slot', 'Tickets', 'Center', 'Details', 'Summary', 'Payment'];
-  const stepIndex = (s: number) => (slotHasVehicles || s <= 1 ? s : s - 1);
+   const steps = ['Slot', 'Tickets', 'Center', 'Details', 'Summary', 'Payment'];
 
-  const handleSlotNext = (dateId: number, slot: SlotOption, date: string) => {
-    setSelectedDateId(dateId);
-    setSelectedSlotId(slot.id);
-    setSelectedDateStr(formatLongDate(date));
-    setSelectedTimeStr(slot.time);
-    setSelectedVehicleTimeStr(slot.vehicle_time || '');
-    setTicketCount(1);
-    setSelectedVehicleId(null);
-    const selectable = (slot.vehicles || []).filter(
-      (v) => v.status === 'available' && (v.available_seats ?? 0) > 0
-    );
-    setSlotVehicles(selectable);
-    setPricePerTicket(Number(slot.price) > 0 ? Number(slot.price) : initialPrice);
-    setStep(selectable.length > 0 ? 1 : 2);
-  };
+   const handleSlotNext = (dateId: number, slot: SlotOption, date: string) => {
+     setSelectedDateId(dateId);
+     setSelectedSlotId(slot.id);
+     setSelectedDateStr(formatLongDate(date));
+     setSelectedTimeStr(slot.time);
+     setTicketCount(1);
+     setPricePerTicket(Number(slot.price) > 0 ? Number(slot.price) : initialPrice);
+     setStep(1);
+   };
 
   const handleTicketsNext = (count: number) => {
     setTicketCount(count);
@@ -988,7 +819,6 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
           slot_id: selectedSlotId,
           passengers,
           exam_center: examCenter,
-          ...(selectedVehicleId ? { vehicle_id: selectedVehicleId } : {}),
         }),
       });
 
@@ -1010,7 +840,7 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
       console.log(`[Booking] Booking created: ${booking.booking_id}`);
       setBookingId(booking.booking_id);
       setBookingAmount(Number(booking.amount) || 0);
-      setStep(6);
+      setStep(5);
     } catch (err) {
       console.error('[Booking] handleCreateBooking error:', err);
       alert('Something went wrong. Please try again.');
@@ -1155,7 +985,7 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
           </p>
         </div>
 
-        <StepIndicator current={stepIndex(step)} steps={steps} />
+        <StepIndicator current={step} steps={steps} />
 
         <div className="glass-card p-6 sm:p-8">
           {step === 0 && (
@@ -1167,21 +997,7 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
             </div>
           )}
 
-          {step === 1 && slotHasVehicles && (
-            <StepSelectVehicle
-              vehicles={slotVehicles}
-              pricePerTicket={pricePerTicket}
-              selectedVehicleId={selectedVehicleId}
-              onSelect={(id) => {
-                console.log(`[Booking] Vehicle selected: ${id}`);
-                setSelectedVehicleId(id);
-              }}
-              onBack={() => setStep(0)}
-              onNext={() => setStep(2)}
-            />
-          )}
-
-          {step === 2 && selectedSlotId && (
+           {step === 1 && selectedSlotId && (
             <div className="animate-fade-in">
               <h2 className="text-2xl font-bold text-[#1e3a5f] mb-2">
                 Number of Tickets
@@ -1189,24 +1005,6 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
               <p className="text-gray-500 mb-1">
                 Selected: {selectedDateStr} at {slotLabel(selectedTimeStr)}
               </p>
-              {selectedVehicle ? (
-                <p className="text-sm text-gray-500 mb-6">
-                  {selectedVehicle.vehicle_type} ({selectedVehicle.vehicle_number}) ·{' '}
-                  <span className="text-orange-600 font-medium">
-                    departs {to12h(selectedVehicle.departure_time)}
-                  </span>
-                  {' · '}
-                  <span className="text-green-600 font-medium">
-                    {selectedVehicle.available_seats} seat{selectedVehicle.available_seats !== 1 ? 's' : ''} available
-                  </span>
-                </p>
-              ) : selectedVehicleTimeStr ? (
-                <p className="text-orange-600 text-sm font-medium mb-6">
-                  Vehicle starts at {to12h(selectedVehicleTimeStr)}
-                </p>
-              ) : (
-                <div className="mb-6" />
-              )}
               <div className="max-w-xs mx-auto">
                 <div className="flex items-center gap-4 mb-6">
                   <button
@@ -1231,15 +1029,10 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
                     +
                   </button>
                 </div>
-                {selectedVehicle && (
-                  <p className="text-xs text-gray-400 text-center mb-6">
-                    Maximum {maxTickets} ticket{maxTickets !== 1 ? 's' : ''} — limited by available vehicle seats
-                  </p>
-                )}
               </div>
               <div className="flex gap-3">
                 <button
-                  onClick={() => setStep(slotHasVehicles ? 1 : 0)}
+                  onClick={() => setStep(0)}
                   className="btn-outline flex-1 justify-center"
                 >
                   Back
@@ -1254,47 +1047,44 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
             </div>
           )}
 
-          {step === 3 && (
+          {step === 2 && (
             <StepSelectExamCenter
               selectedCenter={examCenter}
-              onBack={() => setStep(2)}
+              onBack={() => setStep(1)}
               onNext={handleExamCenterNext}
             />
           )}
 
-          {step === 4 && (
+          {step === 3 && (
             <StepPassengerDetails
               ticketCount={ticketCount}
               pricePerTicket={pricePerTicket}
-              vehicleTime={selectedVehicle?.departure_time || selectedVehicleTimeStr}
-              onBack={() => setStep(3)}
+              onBack={() => setStep(2)}
               onNext={handlePassengersNext}
             />
           )}
 
-          {step === 5 && (
+          {step === 4 && (
             <StepSummary
               selectedDate={selectedDateStr}
               selectedTime={selectedTimeStr}
-              selectedVehicleTime={selectedVehicleTimeStr}
-              selectedVehicle={selectedVehicle}
               examCenter={examCenter}
               passengers={passengers}
               pricePerTicket={pricePerTicket}
-              onBack={() => setStep(4)}
+              onBack={() => setStep(3)}
               onProceedToPayment={handleCreateBooking}
               processing={processing}
             />
           )}
 
-          {step === 6 && bookingId && (
+          {step === 5 && bookingId && (
             <StepRazorpayPayment
               amount={bookingAmount || passengers.length * pricePerTicket}
               bookingRef={bookingId}
               onBack={() => {
                 setPaymentError('');
                 setProcessing(false);
-                setStep(5);
+                setStep(4);
               }}
               onPay={handleRazorpayPayment}
               paymentError={paymentError}

@@ -11,8 +11,6 @@ export interface BookingRow {
   exam_center: string;
   date: string;
   time: string;
-  vehicle_type?: string;
-  vehicle_number?: string;
   passenger_count: number;
   amount: number;
   payment_status: string;
@@ -34,7 +32,6 @@ const HEADER_COLUMNS = [
   'Exam Center',
   'Travel Date',
   'Slot',
-  'Vehicle',
   'Passengers',
   'Amount (₹)',
   'Payment Status',
@@ -44,7 +41,7 @@ const HEADER_COLUMNS = [
   'Booking Date & Time',
 ];
 
-const COL_WIDTHS = [10, 14, 22, 16, 10, 36, 16, 18, 20, 12, 14, 16, 24, 24, 24, 20];
+const COL_WIDTHS = [10, 14, 22, 16, 10, 36, 16, 18, 12, 14, 16, 24, 24, 24, 20];
 
 function mergeRange(rowNumber: number): string {
   // 16 columns → A..P
@@ -146,34 +143,33 @@ export async function generateDateExcel(
           b.mobile,
           b.gender || '-',
           b.exam_center || 'Not Specified',
-          b.date,
-          slotLabel(b.time),
-          b.vehicle_number ? `${b.vehicle_type || ''} ${b.vehicle_number}`.trim() : '-',
-          b.passenger_count,
-          b.amount,
-          b.payment_status === 'confirmed' ? 'Confirmed' : b.payment_status,
-          b.razorpay_payment_id || '-',
-          b.razorpay_order_id || '-',
-          b.razorpay_bank_ref || '-',
-          formatDateTime(b.created_at),
-        ]);
-        dataRow.font = dataFont;
-        dataRow.eachCell((cell, col) => {
-          cell.border = border;
-          cell.alignment = { vertical: 'middle', horizontal: col <= 3 ? 'left' : 'center' };
-        });
-        if (i % 2 === 1) dataRow.eachCell((cell) => { cell.fill = altFill; });
-      }
+           b.date,
+           slotLabel(b.time),
+           b.passenger_count,
+           b.amount,
+           b.payment_status === 'confirmed' ? 'Confirmed' : b.payment_status,
+           b.razorpay_payment_id || '-',
+           b.razorpay_order_id || '-',
+           b.razorpay_bank_ref || '-',
+           formatDateTime(b.created_at),
+         ]);
+         dataRow.font = dataFont;
+         dataRow.eachCell((cell, col) => {
+           cell.border = border;
+           cell.alignment = { vertical: 'middle', horizontal: col <= 3 ? 'left' : 'center' };
+         });
+         if (i % 2 === 1) dataRow.eachCell((cell) => { cell.fill = altFill; });
+       }
 
-      ws.addRow([]); // spacer after slot group
-    }
-  }
+       ws.addRow([]); // spacer after slot group
+     }
+   }
 
-  const buf = await workbook.xlsx.writeBuffer();
-  return Buffer.from(buf);
-}
+   const buf = await workbook.xlsx.writeBuffer();
+   return Buffer.from(buf);
+ }
 
-export async function generateAllDatesExcel(
+ export async function generateAllDatesExcel(
   dateGroups: Record<string, BookingRow[]>
 ): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
@@ -240,30 +236,29 @@ export async function generateAllDatesExcel(
             b.mobile,
             b.gender || '-',
             b.exam_center || 'Not Specified',
-            b.date,
-            slotLabel(b.time),
-            b.vehicle_number ? `${b.vehicle_type || ''} ${b.vehicle_number}`.trim() : '-',
-            b.passenger_count,
-            b.amount,
-            b.payment_status === 'confirmed' ? 'Confirmed' : b.payment_status,
-            b.razorpay_payment_id || '-',
-            b.razorpay_order_id || '-',
-            b.razorpay_bank_ref || '-',
-            formatDateTime(b.created_at),
-          ]);
-          dataRow.font = dataFont;
-          dataRow.eachCell((cell, col) => {
-            cell.border = border;
-            cell.alignment = { vertical: 'middle', horizontal: col <= 3 ? 'left' : 'center' };
-          });
-          if (i % 2 === 1) dataRow.eachCell((cell) => { cell.fill = altFill; });
-        }
+           b.date,
+           slotLabel(b.time),
+           b.passenger_count,
+           b.amount,
+           b.payment_status === 'confirmed' ? 'Confirmed' : b.payment_status,
+           b.razorpay_payment_id || '-',
+           b.razorpay_order_id || '-',
+           b.razorpay_bank_ref || '-',
+           formatDateTime(b.created_at),
+           ]);
+           dataRow.font = dataFont;
+           dataRow.eachCell((cell, col) => {
+             cell.border = border;
+             cell.alignment = { vertical: 'middle', horizontal: col <= 3 ? 'left' : 'center' };
+           });
+           if (i % 2 === 1) dataRow.eachCell((cell) => { cell.fill = altFill; });
+         }
 
-        ws.addRow([]);
-      }
-    }
-  }
+         ws.addRow([]);
+       }
+     }
+   }
 
-  const buf = await workbook.xlsx.writeBuffer();
-  return Buffer.from(buf);
-}
+   const buf = await workbook.xlsx.writeBuffer();
+   return Buffer.from(buf);
+ }

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dbExecute, rowsToObjects } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth';
-import { generateDateExcel } from '@/lib/excel';
+import { generateDateExcel, generateAllDatesExcel } from '@/lib/excel';
+import { getISTNow, getISTComponents } from '@/lib/dates';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -14,7 +15,6 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const downloadDate = searchParams.get('download');
 
-    // Download a specific date's Excel file
     if (downloadDate) {
       console.log(`[Documents] Download requested for ${downloadDate}`);
       const bookings = await getBookingsForDate(downloadDate);
@@ -24,11 +24,7 @@ export async function GET(request: NextRequest) {
       }
 
       const buf = await generateDateExcel(downloadDate, bookings);
-      const fileName = downloadDate.replace(/-/g, '-');
-      const dateObj = new Date(downloadDate);
-      const dd = String(dateObj.getDate()).padStart(2, '0');
-      const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
-      const yyyy = dateObj.getFullYear();
+      const { dd, mm, yyyy } = getISTComponents(downloadDate);
 
       console.log(`[Documents] Generated Excel for ${downloadDate}: ${bookings.length} bookings`);
       return new NextResponse(new Uint8Array(buf), {
@@ -66,6 +62,49 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export async function POST(request: NextRequest) {
+  const email = await getAdminSession();
+  if (!email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  try {
+    const { date } = await request.json();
+    const targetDate = date || getPreviousISTDate();
+
+    console.log(`[Documents] Generating report for ${targetDate}`);
+    const bookings = await getBookingsForDate(targetDate);
+
+    if (bookings.length === 0) {
+      console.log(`[Documents] No bookings found for ${targetDate}`);
+      return NextResponse.json({ error: 'No confirmed bookings for this date' }, { status: 404 });
+    }
+
+    const buf = await generateDateExcel(targetDate, bookings);
+    const { dd, mm, yyyy } = getISTComponents(targetDate);
+
+    console.log(`[Documents] Generated report for ${targetDate}: ${bookings.length} bookings`);
+    return new NextResponse(new Uint8Array(buf), {
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="${dd}-${mm}-${yyyy}.xlsx"`,
+        'Cache-Control': 'no-store, must-revalidate',
+      },
+    });
+  } catch (err: any) {
+    console.error('[API /documents] POST error:', err?.message || err);
+    return NextResponse.json({ error: 'Failed to generate report' }, { status: 500 });
+  }
+}
+
+function getPreviousISTDate(): string {
+  const now = getISTNow();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const dd = String(yesterday.getDate()).padStart(2, '0');
+  const mm = String(yesterday.getMonth() + 1).padStart(2, '0');
+  const yyyy = yesterday.getFullYear();
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 async function getBookingsForDate(dateStr: string) {
   const result = await dbExecute(
     `SELECT b.booking_id, b.exam_center, b.passenger_count, b.amount,
@@ -73,7 +112,6 @@ async function getBookingsForDate(dateStr: string) {
             b.razorpay_payment_id, b.razorpay_order_id, b.razorpay_bank_ref,
             b.razorpay_status, b.razorpay_method, b.payment_timestamp,
             b.customer_name, b.customer_mobile, b.customer_email,
-            b.vehicle_type, b.vehicle_number,
             d.date, s.time,
             (SELECT p.name FROM passengers p WHERE p.booking_id = b.booking_id ORDER BY p.id LIMIT 1) as name,
             (SELECT p.mobile FROM passengers p WHERE p.booking_id = b.booking_id ORDER BY p.id LIMIT 1) as mobile,
