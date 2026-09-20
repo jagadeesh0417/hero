@@ -41,6 +41,9 @@ export default function AdminBookings() {
   const [statusFilter, setStatusFilter] = useState('');
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Debounce the search box so a request isn't fired on every keystroke.
   useEffect(() => {
@@ -48,16 +51,31 @@ export default function AdminBookings() {
     return () => clearTimeout(t);
   }, [search]);
 
-  const loadBookings = useCallback(() => {
+  const loadBookings = useCallback(async () => {
     const params = new URLSearchParams();
     if (debouncedSearch) params.set('search', debouncedSearch);
     if (statusFilter) params.set('status', statusFilter);
-    fetch(`/api/bookings?${params.toString()}`)
-      .then((r) => r.json())
-      .then(setBookings);
+    try {
+      const res = await fetch(`/api/bookings?${params.toString()}`);
+      if (!res.ok) throw new Error(`API ${res.status}`);
+      const data = await res.json();
+      setBookings(data);
+      setError(null);
+    } catch {
+      setError('Unable to load bookings');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, [debouncedSearch, statusFilter]);
 
-  useEffect(loadBookings, [loadBookings]);
+  useEffect(() => { loadBookings(); }, [loadBookings]);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    setError(null);
+    loadBookings();
+  };
 
   const handleManualConfirm = async (bookingId: string) => {
     setConfirmingId(bookingId);
@@ -111,6 +129,42 @@ export default function AdminBookings() {
           {confirmError}
         </div>
       )}
+
+      {refreshing && (
+        <div className="mb-4 flex items-center gap-2 text-sm text-[#1e3a5f]">
+          <div className="w-4 h-4 border-2 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
+          Refreshing...
+        </div>
+      )}
+
+      {error && bookings.length > 0 && (
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-sm">
+          {error}. <button onClick={handleRefresh} className="underline font-medium">Retry</button>.
+        </div>
+      )}
+
+      {error && bookings.length === 0 && (
+        <div className="text-center py-20">
+          <div className="text-gray-500 text-lg mb-4">{error}</div>
+          <button onClick={handleRefresh} className="px-4 py-2 bg-[#1e3a5f] text-white rounded-lg font-medium hover:bg-[#152d4a]">
+            Retry
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && bookings.length === 0 && (
+        <div className="text-center py-20">
+          <div className="text-gray-500">No bookings found</div>
+        </div>
+      )}
+
+      {loading && bookings.length === 0 && (
+        <div className="flex items-center justify-center py-20">
+          <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
+
+      {!loading && bookings.length > 0 && (
 
       <div className="glass-card overflow-hidden">
         <div className="overflow-x-auto">
@@ -233,10 +287,11 @@ export default function AdminBookings() {
                   </tr>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
+             </tbody>
+           </table>
+         </div>
+       </div>
+       )}
+     </div>
+   );
 }

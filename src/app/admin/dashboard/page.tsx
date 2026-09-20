@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import LoadingButton from '@/components/ui/LoadingButton';
 
@@ -25,65 +25,41 @@ interface Stats {
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [initialLoad, setInitialLoad] = useState(true);
   const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
-  const loadStats = () => {
+  const loadStats = useCallback(async () => {
     setRefreshing(true);
-    fetch('/api/admin/stats')
-      .then((r) => r.json())
-      .then(setStats)
-      .finally(() => setRefreshing(false));
-  };
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/stats');
+      if (!res.ok) throw new Error(`API ${res.status}`);
+      const data = await res.json();
+      setStats(data);
+      setError(null);
+    } catch {
+      setError('Unable to refresh stats');
+    } finally {
+      setRefreshing(false);
+      setInitialLoad(false);
+    }
+  }, []);
 
   useEffect(() => {
     loadStats();
     intervalRef.current = setInterval(loadStats, 30000);
     return () => clearInterval(intervalRef.current);
-  }, []);
+  }, [loadStats]);
 
   const cards = [
-    {
-      label: 'Total Bookings',
-      value: stats?.totalBookings ?? 0,
-      icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
-      color: 'bg-blue-50 text-blue-600',
-    },
-    {
-      label: 'Revenue',
-      value: `₹${(stats?.revenue ?? 0).toLocaleString('en-IN')}`,
-      icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
-      color: 'bg-green-50 text-green-600',
-    },
-    {
-      label: 'Upcoming Slots',
-      value: stats?.upcomingSlots ?? 0,
-      icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
-      color: 'bg-purple-50 text-purple-600',
-    },
-    {
-      label: 'Pending Bookings',
-      value: stats?.pendingBookings ?? 0,
-      icon: 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
-      color: 'bg-amber-50 text-amber-600',
-    },
-    {
-      label: 'Total Passengers',
-      value: stats?.totalPassengers ?? 0,
-      icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z',
-      color: 'bg-pink-50 text-pink-600',
-    },
-    {
-      label: 'Travel Dates',
-      value: stats?.totalDates ?? 0,
-      icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
-      color: 'bg-teal-50 text-teal-600',
-    },
-    {
-      label: 'Expired Slots',
-      value: stats?.expiredSlots ?? 0,
-      icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z',
-      color: 'bg-red-50 text-red-600',
-    },
+    { label: 'Total Bookings', value: stats?.totalBookings ?? 0, icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', color: 'bg-blue-50 text-blue-600' },
+    { label: 'Revenue', value: `₹${(stats?.revenue ?? 0).toLocaleString('en-IN')}`, icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z', color: 'bg-green-50 text-green-600' },
+    { label: 'Upcoming Slots', value: stats?.upcomingSlots ?? 0, icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', color: 'bg-purple-50 text-purple-600' },
+    { label: 'Pending Bookings', value: stats?.pendingBookings ?? 0, icon: 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z', color: 'bg-amber-50 text-amber-600' },
+    { label: 'Total Passengers', value: stats?.totalPassengers ?? 0, icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z', color: 'bg-pink-50 text-pink-600' },
+    { label: 'Travel Dates', value: stats?.totalDates ?? 0, icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', color: 'bg-teal-50 text-teal-600' },
+    { label: 'Expired Slots', value: stats?.expiredSlots ?? 0, icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z', color: 'bg-red-50 text-red-600' },
   ];
 
   const examSlotCards = [
@@ -134,7 +110,30 @@ export default function AdminDashboard() {
         </LoadingButton>
       </div>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+      {initialLoad && !stats && (
+        <div className="flex items-center justify-center py-20">
+          <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
+
+      {error && stats && (
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-sm">
+          {error}. <button onClick={loadStats} className="underline font-medium">Retry</button>.
+        </div>
+      )}
+
+      {error && !stats && (
+        <div className="text-center py-20">
+          <div className="text-gray-500 text-lg mb-4">Unable to load dashboard data</div>
+          <button onClick={loadStats} className="px-4 py-2 bg-[#1e3a5f] text-white rounded-lg font-medium hover:bg-[#152d4a]">
+            Retry
+          </button>
+        </div>
+      )}
+
+      {stats && (
+        <>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         {cards.map((card) => (
           <div key={card.label} className="glass-card p-5">
             <div className="flex items-center gap-4">
@@ -277,6 +276,8 @@ export default function AdminDashboard() {
           />
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

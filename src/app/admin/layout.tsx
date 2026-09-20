@@ -74,10 +74,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  if (!authenticated) return null;
+  if (!authenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50 flex overflow-x-hidden">
       {/* Backdrop overlay for mobile sidebar */}
       {sidebarOpen && (
         <div
@@ -162,7 +168,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-h-screen">
+      <div className="flex-1 flex flex-col min-h-screen overflow-x-hidden">
         <header className="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between lg:justify-end">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -175,7 +181,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <p className="text-sm text-gray-500">Suman Travels Admin</p>
         </header>
 
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex-1 p-4 sm:p-6 max-w-[100%] overflow-x-hidden">{children}</main>
       </div>
     </div>
   );

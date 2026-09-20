@@ -1,17 +1,12 @@
 import { NextResponse } from 'next/server';
 import { dbExecute, rowToObject } from '@/lib/db';
 import { getAdminSession } from '@/lib/auth';
-import { cleanupExpiredDates } from '@/lib/cleanup';
-import { expireSlots } from '@/lib/expiry';
 
 export async function GET() {
   const email = await getAdminSession();
   if (!email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    await cleanupExpiredDates();
-    await expireSlots();
-
     const [totalBookings, totalPayments, activeSlots, revenue, pendingBookings, totalPassengers, totalDates, availableSeats, upcomingSlots, expiredSlots, examSlotVehicleStats] =
       await Promise.all([
         dbExecute("SELECT COUNT(*) as cnt FROM bookings WHERE payment_status = 'confirmed'"),
