@@ -24,7 +24,7 @@ export async function GET() {
              COUNT(*) as vehicle_count,
              COALESCE(SUM(total_seats), 0) as total_capacity,
              COALESCE(SUM(booked_seats), 0) as booked_seats,
-             COALESCE(SUM(CASE WHEN status = 'available' THEN total_seats - booked_seats ELSE 0 END), 0) as available_seats
+             COALESCE(SUM(CASE WHEN vehicles.status = 'available' THEN total_seats - booked_seats ELSE 0 END), 0) as available_seats
            FROM vehicles
            JOIN slots s ON vehicles.slot_id = s.id
            WHERE vehicles.status != 'cancelled' AND s.status = 'active'`
