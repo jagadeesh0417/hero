@@ -122,14 +122,26 @@ export async function POST(request: NextRequest) {
       // Find and update booking status to failed
       try {
         const bookingResult = await dbExecute(
-          "SELECT booking_id FROM bookings WHERE razorpay_order_id = ?",
+          "SELECT booking_id, payment_status FROM bookings WHERE razorpay_order_id = ?",
           [razorpayOrderId]
         );
         const booking = rowToObject(bookingResult);
         if (booking) {
           const bookingId = booking.booking_id as string;
+          const currentStatus = booking.payment_status as string;
+          // Never revert a confirmed booking: a delayed payment.failed webhook
+          // for a later attempt must not undo an already-captured confirmation.
+          if (currentStatus === 'confirmed') {
+            console.log(`[Webhook] payment.failed for ${bookingId} ignored — booking already confirmed`);
+            await logPaymentEvent(razorpayOrderId, payment.id || '', 'payment.failed', 'ignored_confirmed', failedAmount, true, bookingId, rawBody.slice(0, 500));
+            return NextResponse.json({ status: 'ignored_confirmed', booking_id: bookingId });
+          }
+          if (currentStatus === 'failed') {
+            console.log(`[Webhook] payment.failed for ${bookingId} ignored — booking already failed`);
+            return NextResponse.json({ status: 'already_failed', booking_id: bookingId });
+          }
           await dbExecute(
-            "UPDATE bookings SET payment_status = 'failed', razorpay_payment_id = ?, razorpay_status = 'failed' WHERE booking_id = ?",
+            "UPDATE bookings SET payment_status = 'failed', razorpay_payment_id = ?, razorpay_status = 'failed' WHERE booking_id = ? AND payment_status != 'confirmed'",
             [payment.id || '', bookingId]
           );
           console.log(`[Webhook] Booking ${bookingId} marked as failed`);

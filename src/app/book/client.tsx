@@ -820,6 +820,8 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
       if (error) {
         if (error === 'payment_failed') {
           setPaymentError('Payment was not completed. Please try again.');
+        } else if (error === 'payment_detected') {
+          setPaymentError('Your payment was received. We are confirming your booking — please wait. You will NOT be charged again.');
         } else if (error === 'server_error') {
           setPaymentError('A server error occurred. Please try again.');
         } else {
@@ -856,18 +858,43 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
     }
   }, [bookingId, step, router]);
 
-  // If user lands on payment step and booking is already confirmed, redirect
+  // If the payment for this booking already succeeded but confirmation hasn't
+  // completed yet (e.g. callback interrupted by a network/DB hiccup), poll the
+  // status endpoint until it resolves. Confirmed -> /success. The customer must
+  // never have to pay twice.
   useEffect(() => {
-    if (bookingId && step === 5) {
+    if (!bookingId || step !== 5) return;
+    let cancelled = false;
+    let attempts = 0;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const check = () => {
       fetch(`/api/razorpay/status?booking_id=${bookingId}`, { cache: 'no-store' })
         .then((r) => r.json())
         .then((data) => {
+          if (cancelled) return;
           if (data.status === 'confirmed') {
             router.push(`/success?id=${bookingId}`);
+          } else if (data.status === 'paid_detected' || data.status === 'pending') {
+            attempts += 1;
+            if (attempts >= 30) {
+              if (timer) clearInterval(timer);
+              cancelled = true;
+              setPaymentError('Your payment was successful. We are still confirming your booking — please wait a moment or contact support with your ref, you will not be charged again.');
+            }
+          } else if (data.status === 'failed') {
+            if (timer) clearInterval(timer);
+            cancelled = true;
+            setPaymentError('This payment was not completed. Please try again.');
           }
         })
         .catch(() => {});
-    }
+    };
+    check();
+    timer = setInterval(check, 4000);
+    return () => {
+      cancelled = true;
+      if (timer) clearInterval(timer);
+    };
   }, [bookingId, step, router]);
 
    const [pricePerTicket, setPricePerTicket] = useState(initialPrice);
@@ -1001,6 +1028,12 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
 
       if (!res.ok || !data.order_id) {
         console.error(`[Payment] Create order failed: ${data.error || 'Unknown error'}`);
+        // The customer already paid on this booking — never offer a second
+        // charge. Route to confirmation recovery instead.
+        if (data.status === 'payment_already_completed') {
+          setPaymentError('Your payment was received. We are confirming your booking — please wait. You will NOT be charged again.');
+          return;
+        }
         setPaymentError(data.error || 'Could not initiate payment. Please try again.');
         return;
       }

@@ -60,7 +60,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL(`/book?error=payment_failed&id=${encodeURIComponent(bookingId)}`, base));
     }
 
-    const result = await confirmBooking(bookingId, orderId, paymentId);
+    let result;
+    try {
+      result = await confirmBooking(bookingId, orderId, paymentId);
+    } catch (err: unknown) {
+      // confirmBooking throws only after exhausting its DB retries. Never show
+      // the customer a raw 500 after a successful payment — send them back to a
+      // recovery state that knows the payment succeeded (no second charge).
+      console.error(`[RzCallback] confirmBooking threw for ${bookingId}:`, err instanceof Error ? err.message : err);
+      await logEvent(orderId, paymentId, 'confirm_throw', 'server_error', bookingId, err instanceof Error ? err.message : 'unknown');
+      return NextResponse.redirect(new URL(`/book?error=payment_detected&id=${encodeURIComponent(bookingId)}`, base));
+    }
 
     if (result.success) {
       console.log(`[RzCallback] Booking ${bookingId} confirmed, serial=${result.serial_number}`);

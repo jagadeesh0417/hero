@@ -50,6 +50,19 @@ export async function POST(request: NextRequest) {
     if (existingOrderId) {
       try {
         const existing = await fetchOrderStatus(existingOrderId);
+        // Payment already captured on this order but the booking is not yet
+        // confirmed (e.g. the confirmation step failed transiently). Never
+        // create a second order — the frontend must route to recovery instead
+        // of charging the customer again.
+        if (existing.status === 'paid') {
+          console.log(`[create-order] Order ${existingOrderId} already paid for booking ${booking_id} — refusing new order`);
+          return NextResponse.json({
+            error: 'A payment was already completed for this booking. Please continue instead of paying again.',
+            status: 'payment_already_completed',
+            booking_id,
+            order_id: existingOrderId,
+          }, { status: 409 });
+        }
         const isPayable =
           (existing.status === 'created' || existing.status === 'attempted') &&
           existing.amount === expectedAmountPaise &&

@@ -29,3 +29,12 @@ This version has breaking changes — APIs, conventions, and file structure may 
    - Admin booking list: "Confirm" button for pending bookings, shows "Confirmed Manually" badge (blue)
    - Admin booking detail: "Confirm Booking" card with modal dialog ("Are you sure...")
    - Existing auto-confirmation via Razorpay/webhook remains completely untouched
+8. **"Paid but booking fails" hardening** (mock-gateway verified, all 35 tests pass):
+   - **Amount/currency verification in `confirmBooking`** (`src/lib/razorpay.ts:~235`): rejects confirmation when the captured payment amount (paise) or currency (`INR`) doesn't match the booking amount; logs `amount_mismatch` to `payment_events` and leaves the booking pending for reconciliation (never confirm wrong amount).
+   - **`fetchPayment` now returns `amount` + `currency`** (`src/lib/razorpay.ts:~71`).
+   - **Callback never 500s after a successful payment** (`src/app/api/razorpay/callback/route.ts`): `confirmBooking` wrapped in try/catch; on a throw (DB contention exhausted) redirects to `/book?error=payment_detected&id=…` instead of rendering a server error page.
+   - **`payment.failed` webhook can no longer revert a confirmed booking** (`src/app/api/razorpay/webhook/route.ts`): skips marking `failed` when the booking is already `confirmed` (returns `ignored_confirmed`) or already `failed`; the UPDATE is guarded with `AND payment_status != 'confirmed'`.
+   - **Double-charge protection** (`src/app/api/razorpay/create-order/route.ts`): if the booking's existing Razorpay order is already `paid` (payment captured but booking not yet confirmed), returns `409 {status:'payment_already_completed'}` instead of creating a NEW order.
+   - **Frontend auto-recovery** (`src/app/book/client.tsx`): the payment step now POLLS (`/api/razorpay/status` every 4s, up to 30×) instead of one-shot; on `confirmed` → `/success`. Handles `?error=payment_detected` and the 409 with a "you will NOT be charged again" message.
+   - **Validation harness** `tests/payment-flow.mjs` (18 scenarios / 35 assertions, incl. T10 amount-mismatch must-not-confirm, T16 delayed-failed-must-not-revert, T18 paid-but-unconfirmed-409). Verified against a mock Razorpay SDK; mock removed before build — harness is not runnable without reinstalling `node_modules/razorpay` mock.
+   - Typecheck (`tsc --noEmit`) clean; `next build` succeeded.

@@ -72,6 +72,8 @@ export interface RazorpayPaymentDetails {
   status: string;
   method: string;
   bank_transaction_id: string | null;
+  amount: number;
+  currency: string;
 }
 
 export async function fetchPayment(paymentId: string): Promise<RazorpayPaymentDetails> {
@@ -81,6 +83,8 @@ export async function fetchPayment(paymentId: string): Promise<RazorpayPaymentDe
     status: payment.status || '',
     method: payment.method || '',
     bank_transaction_id: payment.acquirer_data?.bank_transaction_id || null,
+    amount: Number(payment.amount) || 0,
+    currency: payment.currency || 'INR',
   };
 }
 
@@ -226,6 +230,25 @@ export async function confirmBooking(
         await tx.rollback();
         console.error(`[confirmBooking] ✗ Order mismatch for booking ${booking_id}: stored=${storedOrderId}, given=${razorpay_order_id}`);
         return { success: false, error: 'Payment order does not match this booking. Please contact support.' };
+      }
+
+      // Verify the paid amount and currency match what this booking should cost.
+      // A captured payment for the wrong amount must NEVER confirm a booking.
+      const expectedPaise = Math.round((Number(booking.amount) || 0) * 100);
+      const paidPaise = paymentDetails.amount || 0;
+      if (paidPaise !== expectedPaise || paymentDetails.currency !== 'INR') {
+        await tx.rollback();
+        console.error(`[confirmBooking] ✗ Amount/currency mismatch for booking ${booking_id}: expected ${expectedPaise} paise INR, got ${paidPaise} ${paymentDetails.currency} — refusing to confirm`);
+        try {
+          await dbExecute(
+            `INSERT INTO payment_events (razorpay_order_id, razorpay_payment_id, event, status, amount, signature_valid, booking_id, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+            [razorpay_order_id, razorpay_payment_id, 'amount_mismatch', 'rejected', paidPaise, 1, booking_id]
+          );
+        } catch (logErr: any) {
+          console.error('[confirmBooking] amount_mismatch log error:', logErr?.message || logErr);
+        }
+        return { success: false, error: 'Payment amount did not match the booking amount. Please contact support.' };
       }
 
       const slotTime = booking.time as string;
