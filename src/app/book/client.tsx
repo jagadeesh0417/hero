@@ -1017,6 +1017,14 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
 
     try {
       console.log(`[Payment] Initiating payment for booking ${bookingId}`);
+      // Safe diagnostic — no secrets. If Razorpay reports "Website mismatch",
+      // the origin below must match the approved website in the Razorpay dashboard
+      // (https://www.sumantravels.online). If it says "sumantravels.online" (no
+      // www) the apex→www redirect hasn't taken effect — clear cache / incognito.
+      console.log(
+        `[Payment] Browser origin: ${window.location.origin}  ` +
+        `hostname=${window.location.hostname}  protocol=${window.location.protocol}`
+      );
 
       const res = await fetch('/api/razorpay/create-order', {
         method: 'POST',
@@ -1025,6 +1033,10 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
       });
 
       const data = await res.json();
+
+      console.log(
+        `[Payment] Razorpay key mode: ${data.key_id?.startsWith('rzp_live_') ? 'LIVE' : data.key_id?.startsWith('rzp_test_') ? 'TEST' : 'UNKNOWN'}`
+      );
 
       if (!res.ok || !data.order_id) {
         console.error(`[Payment] Create order failed: ${data.error || 'Unknown error'}`);

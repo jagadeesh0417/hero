@@ -1,0 +1,26 @@
+{
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "sumantravels.online"
+        }
+      ],
+      "destination": "https://www.sumantravels.online/:1",
+      "permanent": true
+    },
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "scheme",
+          "value": "http"
+        }
+      ],
+      "destination": "https://www.sumantravels.online/:1",
+      "permanent": true
+    }
+  ]
+}
