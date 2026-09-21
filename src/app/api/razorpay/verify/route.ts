@@ -65,3 +65,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Payment verification failed' }, { status: 500 });
   }
 }
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: { Allow: 'POST' } });
+}
+export async function GET() {
+  return NextResponse.json({ error: 'Method not allowed' }, { status: 405, headers: { Allow: 'POST' } });
+}

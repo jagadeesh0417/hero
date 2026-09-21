@@ -125,10 +125,17 @@ export async function POST(request: NextRequest) {
     const description = err.error?.description || err.message || 'Failed to create payment order';
     const code = err.error?.code;
     const field = err.error?.field;
-    return NextResponse.json({
-      error: description,
-      ...(code ? { code } : {}),
-      ...(field ? { field } : {}),
-    }, { status: statusCode });
+      return NextResponse.json({
+        error: description,
+        ...(code ? { code } : {}),
+        ...(field ? { field } : {}),
+      }, { status: statusCode });
   }
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: { Allow: 'POST' } });
+}
+export async function GET() {
+  return NextResponse.json({ error: 'Method not allowed' }, { status: 405, headers: { Allow: 'POST' } });
 }

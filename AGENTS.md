@@ -38,3 +38,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
    - **Frontend auto-recovery** (`src/app/book/client.tsx`): the payment step now POLLS (`/api/razorpay/status` every 4s, up to 30×) instead of one-shot; on `confirmed` → `/success`. Handles `?error=payment_detected` and the 409 with a "you will NOT be charged again" message.
    - **Validation harness** `tests/payment-flow.mjs` (18 scenarios / 35 assertions, incl. T10 amount-mismatch must-not-confirm, T16 delayed-failed-must-not-revert, T18 paid-but-unconfirmed-409). Verified against a mock Razorpay SDK; mock removed before build — harness is not runnable without reinstalling `node_modules/razorpay` mock.
    - Typecheck (`tsc --noEmit`) clean; `next build` succeeded.
+9. **HTTP 405 on Razorpay API routes fixed** (verified with curl; all 35 harness assertions still pass):
+   - Every POST-only payment route (`/api/razorpay/create-order`, `/verify`, `/webhook`, `/recover`, and legacy `/api/payment`) now exports an `OPTIONS` handler (204 + `Allow: POST`) and an explicit `GET` handler returning JSON `{"error":"Method not allowed"}` 405. GET still cannot create/confirm anything.
+   - Next.js default 405 for these routes previously rendered an HTML error page when a browser/mobile device opened them directly. All frontend calls already use the correct methods (audited: `fetch` POST/GET only; no `location.href`/`router.push` to any API route).
+   - `GET /api/razorpay/callback` (307 redirect) and `GET /api/razorpay/status` remain the only browser-navigable Razorpay endpoints.
+   - Re-verified identically after edits: mock harness 35/35 pass, `tsc --noEmit` clean, `next build` succeeds with the real SDK restored.
