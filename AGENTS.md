@@ -50,3 +50,14 @@ This version has breaking changes — APIs, conventions, and file structure may 
     - `/success` is the DB-backed confirmation page: it polls `/api/bookings/[id]/status?t=<receipt_token>` while pending and only shows "Booking Confirmed" when the server says confirmed; shows Payment Verification Pending / Payment Failed with Try Again otherwise. Added `Download Ticket` (existing token-gated .docx receipt) and `Print Booking` (`window.print()` with print-only CSS).
     - Verified: mock harness 35/35 pass; live mock check POST callback → 303 → `/success`; GET callback → 307; `tsc --noEmit` clean; `next build` succeeds.
     - Deploy env: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` (+ `RAZORPAY_WEBHOOK_SECRET` for webhook), existing DB vars. No `NEXT_PUBLIC_` secret.
+11. **Desktop-only Razorpay "Business - Website mismatch" fix** (commit `5ee5291`):
+    - Symptom: payment worked on mobile but failed on desktop with "Business - Website mismatch". Razorpay dashboard approved website = `https://www.sumantravels.online`.
+    - Root cause: desktop users typing `sumantravels.online` (no `www`) in the address bar land on the apex domain. No `www`→`apex` redirect existed in the app (`next.config.ts` had no redirects, `vercel.json` did not exist, no `middleware.ts`). Razorpay checkout.js checks `window.location.origin` against the dashboard-registered website; apex origin ≠ www origin → mismatch.
+    - Mobile worked because mobile users arrived via social media/WhatsApp links that include `www.sumantravels.online`.
+    - Audit confirmed: zero device-detection code, no desktop/mobile branching, same code path for both. The difference was purely the browser's hostname.
+    - Fix (3 parts):
+      1. **`vercel.json` (new)** — CDN-edge permanent redirects: `sumantravels.online/*` → `https://www.sumantravels.online/*` and HTTP → HTTPS. Processed at Vercel's edge before the serverless function runs.
+      2. **`next.config.ts`** — Added `async redirects()` with the same apex→www rule as a server-side fallback (also works in dev).
+      3. **`src/app/book/client.tsx`** — Added safe diagnostic logging at payment init: `window.location.origin`, `hostname`, `protocol`, and Razorpay key mode (LIVE/TEST/UNKNOWN). No secrets logged. Helps verify the correct origin in DevTools console.
+    - `tsc --noEmit` clean; `next build` succeeded.
+    - **User action required**: Also add `sumantravels.online` (apex, no www) to the Razorpay Dashboard → Settings → API Keys → Approved Websites as a belt-and-suspenders measure, in case any referrer bypasses the redirect.
