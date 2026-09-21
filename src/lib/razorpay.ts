@@ -180,6 +180,14 @@ export async function confirmBooking(
     return { success: false, error: 'Failed to fetch payment details from Razorpay' };
   }
 
+  // Security: only a real, captured (or auto-captured) payment may confirm a
+  // booking. Never confirm a failed/refunded/uncaptured payment even if a
+  // caller passes a valid-looking payment id.
+  if (paymentDetails.status !== 'captured' && paymentDetails.status !== 'authorized') {
+    console.error(`[confirmBooking] ✗ Payment ${razorpay_payment_id} not captured (status=${paymentDetails.status}) — refusing to confirm booking ${booking_id}`);
+    return { success: false, error: `Payment was not captured (status: ${paymentDetails.status}). Please contact support.` };
+  }
+
   // Retry loop for transient DB failures
   const MAX_DB_RETRIES = 3;
   for (let dbAttempt = 0; dbAttempt < MAX_DB_RETRIES; dbAttempt++) {
@@ -208,6 +216,16 @@ export async function confirmBooking(
         const existingSerial = booking.serial_number ? Number(booking.serial_number) : undefined;
         console.log(`[confirmBooking] Booking ${booking_id} already confirmed, serial=${existingSerial}`);
         return { success: true, serial_number: existingSerial };
+      }
+
+      // Bind the order to the booking: if this booking is already linked to a
+      // different Razorpay order, refuse — this prevents attaching a payment
+      // made on another booking's order to this one.
+      const storedOrderId = (booking.razorpay_order_id as string) || '';
+      if (storedOrderId && storedOrderId !== razorpay_order_id) {
+        await tx.rollback();
+        console.error(`[confirmBooking] ✗ Order mismatch for booking ${booking_id}: stored=${storedOrderId}, given=${razorpay_order_id}`);
+        return { success: false, error: 'Payment order does not match this booking. Please contact support.' };
       }
 
       const slotTime = booking.time as string;

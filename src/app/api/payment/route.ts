@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { dbExecute, rowsToObjects, rowToObject } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
+import { getAdminSession } from '@/lib/auth';
 
 export async function POST(request: Request) {
+  const email = await getAdminSession();
+  if (!email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const { booking_id, utr_number } = await request.json();
 

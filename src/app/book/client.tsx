@@ -28,6 +28,16 @@ function ensureRazorpayLoaded(): Promise<void> {
     script.async = true;
     script.onload = () => resolve();
     script.onerror = () => reject(new Error('Failed to load Razorpay checkout. Please check your connection and retry.'));
+    const timeout = setTimeout(() => {
+      if (!(window as any).Razorpay) {
+        reject(new Error('Razorpay checkout took too long to load. Please check your connection and retry.'));
+      }
+      script.remove();
+    }, 15000);
+    script.onload = () => {
+      clearTimeout(timeout);
+      resolve();
+    };
     document.body.appendChild(script);
   });
 }
@@ -533,6 +543,7 @@ function StepSummary({
   onBack,
   onProceedToPayment,
   processing,
+  error,
 }: {
   selectedDate: string;
   selectedTime: string;
@@ -542,6 +553,7 @@ function StepSummary({
   onBack: () => void;
   onProceedToPayment: () => void;
   processing: boolean;
+  error: string;
 }) {
   const total = passengers.length * pricePerTicket;
 
@@ -550,6 +562,17 @@ function StepSummary({
       <h2 className="text-2xl font-bold text-[#1e3a5f] mb-6">
         Booking Summary
       </h2>
+
+      {error && (
+        <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-100">
+          <div className="flex items-center gap-3">
+            <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        </div>
+      )}
 
       <div className="glass-card p-6 mb-6">
         <h3 className="font-bold text-gray-900 mb-4">Travel Details</h3>
@@ -635,18 +658,32 @@ function StepSummary({
 function StepRazorpayPayment({
   amount,
   bookingRef,
+  summary,
+  resumedFromUrl,
   onBack,
+  onStartOver,
   onPay,
   paymentError,
   processing,
 }: {
   amount: number;
   bookingRef: string;
+  summary: {
+    date: string;
+    time: string;
+    examCenter: string;
+    passengers: PassengerForm[];
+    amount: number;
+  } | null;
+  resumedFromUrl: boolean;
   onBack: () => void;
+  onStartOver: () => void;
   onPay: () => void;
   paymentError: string;
   processing: boolean;
 }) {
+  const total = summary ? summary.amount : amount;
+
   return (
     <div className="animate-fade-in">
       <h2 className="text-2xl font-bold text-[#1e3a5f] mb-2">Complete Payment</h2>
@@ -665,6 +702,40 @@ function StepRazorpayPayment({
         </div>
       )}
 
+      {summary && (
+        <div className="glass-card p-5 mb-6">
+          <h3 className="font-bold text-gray-900 mb-3">Booking Summary</h3>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-500">Travel Date</span>
+              <span className="font-semibold">{summary.date}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Exam Time</span>
+              <span className="font-semibold">{slotLabel(summary.time)}</span>
+            </div>
+            {summary.examCenter && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Exam Center</span>
+                <span className="font-semibold text-right">{summary.examCenter}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-gray-500">Tickets</span>
+              <span className="font-semibold">{summary.passengers.length}</span>
+            </div>
+            {summary.passengers.length > 0 && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Passenger{summary.passengers.length > 1 ? 's' : ''}</span>
+                <span className="font-semibold text-right">
+                  {summary.passengers.map((p) => p.name).filter(Boolean).join(', ') || `${summary.passengers.length} ticket(s)`}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="glass-card p-8 text-center mb-8">
         <div className="w-16 h-16 rounded-2xl bg-[#1e3a5f]/5 flex items-center justify-center mx-auto mb-4">
           <svg className="w-8 h-8 text-[#1e3a5f]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -672,7 +743,7 @@ function StepRazorpayPayment({
           </svg>
         </div>
         <div className="text-3xl font-bold text-[#1e3a5f] mb-2">
-          ₹{amount.toLocaleString('en-IN')}
+          ₹{total.toLocaleString('en-IN')}
         </div>
         <p className="text-gray-500">Total Amount</p>
         <p className="text-sm text-gray-400 mt-4">
@@ -695,11 +766,11 @@ function StepRazorpayPayment({
         </LoadingButton>
 
         <button
-          onClick={onBack}
+          onClick={resumedFromUrl ? onStartOver : onBack}
           disabled={processing}
           className="btn-outline w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Back
+          {resumedFromUrl ? 'Start New Booking' : 'Back'}
         </button>
 
         <p className="text-xs text-gray-400 text-center">
@@ -725,16 +796,27 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
   const [processing, setProcessing] = useState(false);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [bookingAmount, setBookingAmount] = useState(0);
+  const [bookingError, setBookingError] = useState('');
   const [paymentError, setPaymentError] = useState('');
+  const [resumedFromUrl, setResumedFromUrl] = useState(false);
   const bookingBusyRef = useRef(false);
   const paymentBusyRef = useRef(false);
+
+  const [paymentSummary, setPaymentSummary] = useState<{
+    date: string;
+    time: string;
+    examCenter: string;
+    passengers: PassengerForm[];
+    amount: number;
+  } | null>(null);
 
   useEffect(() => {
     const error = searchParams.get('error');
     const bid = searchParams.get('id');
     if (bid) {
       setBookingId(bid);
-      setStep(6);
+      setResumedFromUrl(true);
+      setStep(5);
       if (error) {
         if (error === 'payment_failed') {
           setPaymentError('Payment was not completed. Please try again.');
@@ -744,12 +826,28 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
           setPaymentError('Payment could not be processed. Please try again.');
         }
       }
+      // Populate the payment screen summary from the saved booking.
+      fetch(`/api/bookings/${bid}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data) {
+            setBookingAmount(Number(data.amount) || 0);
+            setPaymentSummary({
+              date: data.date || '',
+              time: data.time || '',
+              examCenter: data.exam_center || '',
+              passengers: (data.passengers || []).map((p: any) => ({ name: p.name || '', mobile: p.mobile || '', gender: p.gender || '' })),
+              amount: Number(data.amount) || 0,
+            });
+          }
+        })
+        .catch(() => {});
     }
   }, [searchParams]);
 
   // Sync booking ID to URL so page refreshes don't lose the booking context
   useEffect(() => {
-    if (bookingId && step >= 6) {
+    if (bookingId && step >= 5) {
       const params = new URLSearchParams(window.location.search);
       if (params.get('id') !== bookingId) {
         params.set('id', bookingId);
@@ -760,7 +858,7 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
 
   // If user lands on payment step and booking is already confirmed, redirect
   useEffect(() => {
-    if (bookingId && step === 6) {
+    if (bookingId && step === 5) {
       fetch(`/api/razorpay/status?booking_id=${bookingId}`, { cache: 'no-store' })
         .then((r) => r.json())
         .then((data) => {
@@ -790,23 +888,50 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
 
   const handleTicketsNext = (count: number) => {
     setTicketCount(count);
-    setStep(3);
+    setStep(2);
   };
 
   const handleExamCenterNext = (center: string) => {
     setExamCenter(center);
-    setStep(4);
+    setStep(3);
   };
 
   const handlePassengersNext = (data: PassengerForm[]) => {
     setPassengers(data);
-    setStep(5);
+    setStep(4);
+  };
+
+  const handleStartOver = () => {
+    setBookingId(null);
+    setBookingAmount(0);
+    setBookingError('');
+    setPaymentError('');
+    setPaymentSummary(null);
+    setResumedFromUrl(false);
+    setSelectedDateId(null);
+    setSelectedSlotId(null);
+    setSelectedDateStr('');
+    setSelectedTimeStr('');
+    setTicketCount(1);
+    setPassengers([]);
+    setExamCenter('');
+    setProcessing(false);
+    setStep(0);
   };
 
   const handleCreateBooking = async () => {
+    // If a booking was already created (e.g. the user went back from Payment to
+    // Summary and clicked Proceed again), reuse it instead of creating a
+    // duplicate booking record.
+    if (bookingId) {
+      setPaymentError('');
+      setStep(5);
+      return;
+    }
     if (!selectedDateId || !selectedSlotId || bookingBusyRef.current) return;
     bookingBusyRef.current = true;
     setProcessing(true);
+    setBookingError('');
 
     try {
       console.log(`[Booking] Creating booking: date=${selectedDateId}, slot=${selectedSlotId}, center=${examCenter}, passengers=${passengers.length}`);
@@ -825,7 +950,7 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
       if (!bookingRes.ok) {
         const err = await bookingRes.json();
         console.error(`[Booking] Create booking failed: ${err.error || 'Unknown error'}`);
-        alert(err.error || 'Booking failed');
+        setBookingError(err.error || 'Could not create your booking. Please try again.');
         return;
       }
 
@@ -833,17 +958,24 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
 
       if (!booking.success || !booking.booking_id) {
         console.error(`[Booking] Unexpected response:`, booking);
-        alert('Booking failed. Please try again.');
+        setBookingError('Could not create your booking. Please try again.');
         return;
       }
 
       console.log(`[Booking] Booking created: ${booking.booking_id}`);
       setBookingId(booking.booking_id);
       setBookingAmount(Number(booking.amount) || 0);
+      setPaymentSummary({
+        date: selectedDateStr,
+        time: selectedTimeStr,
+        examCenter,
+        passengers,
+        amount: Number(booking.amount) || passengers.length * pricePerTicket,
+      });
       setStep(5);
     } catch (err) {
       console.error('[Booking] handleCreateBooking error:', err);
-      alert('Something went wrong. Please try again.');
+      setBookingError('Something went wrong while creating your booking. Please try again.');
     } finally {
       setProcessing(false);
       bookingBusyRef.current = false;
@@ -968,7 +1100,12 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
       setProcessing(false);
     } catch (err) {
       console.error('[Booking] handleRazorpayPayment error:', err);
-      setPaymentError('Could not connect to payment gateway. Please try again.');
+      const errMsg = err instanceof Error ? err.message : '';
+      setPaymentError(
+        errMsg.includes('Razorpay')
+          ? errMsg
+          : 'Could not connect to payment gateway. Please check your connection and try again.'
+      );
     } finally {
       setProcessing(false);
       paymentBusyRef.current = false;
@@ -1074,6 +1211,7 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
               onBack={() => setStep(3)}
               onProceedToPayment={handleCreateBooking}
               processing={processing}
+              error={bookingError}
             />
           )}
 
@@ -1081,11 +1219,14 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
             <StepRazorpayPayment
               amount={bookingAmount || passengers.length * pricePerTicket}
               bookingRef={bookingId}
+              summary={paymentSummary}
+              resumedFromUrl={resumedFromUrl}
               onBack={() => {
                 setPaymentError('');
                 setProcessing(false);
                 setStep(4);
               }}
+              onStartOver={handleStartOver}
               onPay={handleRazorpayPayment}
               paymentError={paymentError}
               processing={processing}
