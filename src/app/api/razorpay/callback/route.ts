@@ -17,23 +17,25 @@ async function logEvent(orderId: string, paymentId: string, event: string, statu
   }
 }
 
-// Razorpay redirects the customer's browser back to this URL after the hosted
-// checkout (standard/web checkout with redirect:true). On success it appends
-// razorpay_payment_id, razorpay_order_id and razorpay_signature. On a failed or
-// cancelled payment those are absent and error fields are present instead.
-export async function GET(request: NextRequest) {
-  const base = request.url;
-  const { searchParams } = new URL(base);
+// Shared handler for Razorpay's browser callback (hosted checkout with
+// redirect:true or callback_method configured on Razorpay's side). This is ONLY
+// a fallback/reconciliation mechanism: the current checkout uses the inline
+// Razorpay handler + POST /api/razorpay/verify, so customers never navigate to
+// this URL in the normal flow. Whatever the method, the callback ALWAYS
+// verifies the payment server-side and then redirects the browser to a real
+// customer-facing page — never an API body, never a 405.
+async function handleCallback(baseUrl: string, params: URLSearchParams, redirectStatus: 307 | 303) {
+  const redir = (relative: string) => NextResponse.redirect(new URL(relative, baseUrl), redirectStatus);
 
-  const orderId = searchParams.get('razorpay_order_id') || '';
-  const paymentId = searchParams.get('razorpay_payment_id') || '';
-  const signature = searchParams.get('razorpay_signature') || '';
-  const errorCode = searchParams.get('error_code') || '';
-  const errorDescription = searchParams.get('error_description') || '';
+  const orderId = params.get('razorpay_order_id') || '';
+  const paymentId = params.get('razorpay_payment_id') || '';
+  const signature = params.get('razorpay_signature') || '';
+  const errorCode = params.get('error_code') || '';
+  const errorDescription = params.get('error_description') || '';
 
   if (!orderId) {
     console.error('[RzCallback] No razorpay_order_id in callback');
-    return NextResponse.redirect(new URL('/book?error=payment_failed', base));
+    return redir('/book?error=payment_failed');
   }
 
   const bookingResult = await dbExecute(
@@ -44,7 +46,7 @@ export async function GET(request: NextRequest) {
 
   if (!booking) {
     console.error(`[RzCallback] No booking found for order ${orderId}`);
-    return NextResponse.redirect(new URL('/book?error=payment_failed', base));
+    return redir('/book?error=payment_failed');
   }
 
   const bookingId = booking.booking_id as string;
@@ -57,7 +59,7 @@ export async function GET(request: NextRequest) {
 
     if (!isValid) {
       console.error(`[RzCallback] Invalid signature for order ${orderId}, payment ${paymentId}`);
-      return NextResponse.redirect(new URL(`/book?error=payment_failed&id=${encodeURIComponent(bookingId)}`, base));
+      return redir(`/book?error=payment_failed&id=${encodeURIComponent(bookingId)}`);
     }
 
     let result;
@@ -69,7 +71,7 @@ export async function GET(request: NextRequest) {
       // recovery state that knows the payment succeeded (no second charge).
       console.error(`[RzCallback] confirmBooking threw for ${bookingId}:`, err instanceof Error ? err.message : err);
       await logEvent(orderId, paymentId, 'confirm_throw', 'server_error', bookingId, err instanceof Error ? err.message : 'unknown');
-      return NextResponse.redirect(new URL(`/book?error=payment_detected&id=${encodeURIComponent(bookingId)}`, base));
+      return redir(`/book?error=payment_detected&id=${encodeURIComponent(bookingId)}`);
     }
 
     if (result.success) {
@@ -80,11 +82,11 @@ export async function GET(request: NextRequest) {
       } catch (err: unknown) {
         console.error('[RzCallback] revalidatePath error:', err instanceof Error ? err.message : err);
       }
-      return NextResponse.redirect(new URL(`/success?id=${encodeURIComponent(bookingId)}`, base));
+      return redir(`/success?id=${encodeURIComponent(bookingId)}`);
     }
 
     console.error(`[RzCallback] confirmBooking failed for ${bookingId}: ${result.error}`);
-    return NextResponse.redirect(new URL(`/book?error=server_error&id=${encodeURIComponent(bookingId)}`, base));
+    return redir(`/book?error=server_error&id=${encodeURIComponent(bookingId)}`);
   }
 
   // Cancelled or failed payment — leave the booking pending so the customer can
@@ -94,5 +96,39 @@ export async function GET(request: NextRequest) {
   } else {
     console.log(`[RzCallback] Payment cancelled for booking ${bookingId}, order ${orderId}`);
   }
-  return NextResponse.redirect(new URL(`/book?error=payment_failed&id=${encodeURIComponent(bookingId)}`, base));
+  return redir(`/book?error=payment_failed&id=${encodeURIComponent(bookingId)}`);
+}
+
+export async function GET(request: NextRequest) {
+  const url = new URL(request.url);
+  return handleCallback(request.url, url.searchParams, 307);
+}
+
+// If Razorpay is (still) configured with callback_method: 'POST' — e.g. an
+// older checkout snippet or dashboard setting — the browser posts the same
+// fields. Accept both form-encoded and JSON so it can never 405, verify,
+// confirm, then redirect to a real page.
+export async function POST(request: NextRequest) {
+  const contentType = request.headers.get('content-type') || '';
+  let params = new URLSearchParams();
+
+  if (contentType.includes('application/json')) {
+    try {
+      const body = await request.json();
+      for (const [k, v] of Object.entries(body)) {
+        if (typeof v === 'string') params.set(k, v);
+      }
+    } catch (err: unknown) {
+      console.error('[RzCallback] Invalid JSON body:', err instanceof Error ? err.message : err);
+    }
+  } else {
+    const text = await request.text();
+    try {
+      params = new URLSearchParams(text);
+    } catch (err: unknown) {
+      console.error('[RzCallback] Invalid form body:', err instanceof Error ? err.message : err);
+    }
+  }
+
+  return handleCallback(request.url, params, 303);
 }

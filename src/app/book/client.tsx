@@ -1040,8 +1040,6 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
 
       console.log(`[Payment] Order created: ${data.order_id}, amount: ${data.amount}`);
 
-      const receiptToken = data.receipt_token;
-
       // Fire checkout events
       const fireEvent = (event: string, detail?: string) => {
         fetch('/api/debug/checkout-event', {
@@ -1062,24 +1060,21 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
         name: 'Suman Travels',
         description: `Booking ${bookingId}`,
         order_id: data.order_id,
-        // Redirect (hosted) checkout — the checkout runs on Razorpay's own
-        // domain in the top frame, which is required for UPI Intent to work on
-        // Android mobile web. In the embedded modal (iframe) Razorpay cannot
-        // launch the customer's UPI apps and falls back to the deprecated UPI
-        // Collect screen ("Enter payer's number"), which fails with
-        // "Login Failed". Razorpay returns to callback_url with the payment
-        // IDs + signature; the callback API verifies and confirms the booking.
-        redirect: true,
-        callback_url: `${window.location.origin}/api/razorpay/callback`,
+        // Inline checkout (redirect:false): the payment runs inside this
+        // website in the same tab, so the customer NEVER leaves sumantravels
+        // and the browser is never redirected to an internal callback URL.
+        // This removes the Android Chrome "Allow redirect to this site?" prompt
+        // and the HTTP 405 page at /api/razorpay/callback that customers hit
+        // with the previous hosted-direct flow. The success response is
+        // delivered to the `handler` below, which POSTs the payment details to
+        // /api/razorpay/verify for server-side signature + amount verification.
+        redirect: false,
         prefill: {
           name: data.customer_name || '',
           contact: normalizeContact(data.customer_mobile),
         },
         theme: { color: '#1e3a5f' },
         handler: async function (response: any) {
-          // In redirect mode the handler is not invoked — Razorpay redirects to
-          // callback_url where the payment is verified server-side. Kept as a
-          // safety net for any checkout path that still runs the modal.
           if (paymentCompleted) return;
           paymentCompleted = true;
           console.log(`[Payment] Razorpay handler fired: payment_id=${response.razorpay_payment_id}`);
@@ -1098,10 +1093,10 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
             });
 
             if (verifyRes.ok) {
-              console.log(`[Payment] Payment verified, navigating to status page for ${bookingId}`);
-              router.push(`/booking/${bookingId}?t=${receiptToken}`);
+              console.log(`[Payment] Payment verified for ${bookingId}, opening confirmation page`);
+              router.replace(`/success?id=${encodeURIComponent(bookingId)}`);
             } else {
-              const errData = await verifyRes.json();
+              const errData = await verifyRes.json().catch(() => ({}));
               console.error(`[Payment] Verification failed: ${errData.error || ''}`);
               setPaymentError(errData.error || 'Payment verification failed. Please contact support.');
               setProcessing(false);
@@ -1109,7 +1104,10 @@ export default function BookPageClient({ initialPrice = 500 }: { initialPrice: n
             }
           } catch (verifyErr) {
             console.error('[Payment] Verify request error:', verifyErr);
-            setPaymentError('Payment verification failed. Please contact support.');
+            // The payment may have succeeded even though this fetch failed —
+            // the /book?id= poll + /api/razorpay/status auto-confirm recover
+            // it, so the customer must NOT be asked to pay again.
+            setPaymentError('Your payment may have been received. We are confirming your booking — please wait. You will NOT be charged again.');
             setProcessing(false);
             paymentBusyRef.current = false;
           }
